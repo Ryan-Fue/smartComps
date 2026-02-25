@@ -1,11 +1,11 @@
 [project]
 name = "smartcomps"
 version = "0.1.0"
-package-mode = false
 description = ""
 authors = [
     {name = "Ryan-Fue",email = "ryanfue@ucla.edu"}
 ]
+package-mode = false
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
