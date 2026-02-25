@@ -1,6 +1,6 @@
 [project]
 name = "smartcomps"
-version = "0.1.0"
+version = "0.1.0"git add pyproject.toml
 description = ""
 authors = [
     {name = "Ryan-Fue",email = "ryanfue@ucla.edu"}
