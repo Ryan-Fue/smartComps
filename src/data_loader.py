@@ -98,20 +98,51 @@ class FinancialDataLoader:
 
         for i in range(start_index, len(all_tickers), chunk_size):
             chunk = all_tickers[i : i + chunk_size]
-            chunk_data = []
-            
-            for ticker in tqdm(chunk, desc=f"Chunk {i//chunk_size}", leave=False):
-                metrics = self._fetch_single_comp_metrics(ticker)
-                if metrics:
-                    chunk_data.append(metrics)
+
+            max_attempts = 3
+            attempt = 0
+            success = False
+
+            while attempt < max_attempts and not success:
+                chunk_data = []
+
+                for ticker in tqdm(chunk, desc=f"Chunk {i//chunk_size}", leave=False):
+                    metrics = self.fetch_single_comp_metrics(ticker)
+                    if metrics:
+                        chunk_data.append(metrics)
+
+                if len(chunk_data) == 0:
+                    attempt += 1
+                    self._fetch_single_comp_metricslogger.warning(f"Chunk {i//chunk_size} failed. Attempt {attempt}/{max_attempts}. Entering 60s cooldown...")
+                    time.sleep(60)
+                else:
+                    success = True
+
             
             # Save the chunk to the CSV 
-            if chunk_data:
+            if success:
                 chunk_df = pd.DataFrame(chunk_data)
+
+                # Logic to account for missing chunk data
+                successful_tickers = chunk_df['ticker'].tolist()
+                missed_tickers = [t for t in chunk if t not in successful_tickers]
+                
+                # Dead letter queue (DQL)
+                if missed_tickers:
+                    dlq_df = pd.DataFrame({"failed_tickers": missed_tickers})
+                    dlq_csv = "data/processed/missed_tickers.csv"
+                    dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
+                    self.logger.info(f"Chunk {i//chunk_size}: {len(missed_tickers)} tickers missing. Saved to DLQ.")
+
                 # If file exists, append without headers. Otherwise, write new
                 chunk_df.to_csv(output_csv, mode='a', header=not os.path.exists(output_csv), index=False)
-            
-            time.sleep(2) # Safety pause
+                time.sleep(2) # Safety pause
+
+            else:
+                self.logger.error(f"CRITICAL: Chunk {i//chunk_size} failed after {max_attempts} attempts. Skipping chunk to keep pipeline alive.")
+                dlq_df = pd.DataFrame({"failed_tickers": chunk})
+                dlq_csv = "data/processed/missed_tickers.csv"
+                dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
         
 if __name__ == "__main__":
     loader = FinancialDataLoader()
