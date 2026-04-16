@@ -113,7 +113,7 @@ class FinancialDataLoader:
             
             time.sleep(2) # Safety pause
         
-if __name__ == "data_loader.py":
+if __name__ == "__main__":
     loader = FinancialDataLoader()
 
     loader.build_csv_comps_table("../data/raw/company_tickers.json", "../data/raw/company_metrics.csv")
