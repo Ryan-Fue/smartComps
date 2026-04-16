@@ -107,13 +107,13 @@ class FinancialDataLoader:
                 chunk_data = []
 
                 for ticker in tqdm(chunk, desc=f"Chunk {i//chunk_size}", leave=False):
-                    metrics = self.fetch_single_comp_metrics(ticker)
+                    metrics = self._fetch_single_comp_metrics(ticker)
                     if metrics:
                         chunk_data.append(metrics)
 
                 if len(chunk_data) == 0:
                     attempt += 1
-                    self._fetch_single_comp_metricslogger.warning(f"Chunk {i//chunk_size} failed. Attempt {attempt}/{max_attempts}. Entering 60s cooldown...")
+                    self.logger.warning(f"Chunk {i//chunk_size} failed. Attempt {attempt}/{max_attempts}. Entering 60s cooldown...")
                     time.sleep(60)
                 else:
                     success = True
@@ -130,7 +130,7 @@ class FinancialDataLoader:
                 # Dead letter queue (DQL)
                 if missed_tickers:
                     dlq_df = pd.DataFrame({"failed_tickers": missed_tickers})
-                    dlq_csv = "data/processed/missed_tickers.csv"
+                    dlq_csv = "..data/processed/missed_tickers.csv"
                     dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
                     self.logger.info(f"Chunk {i//chunk_size}: {len(missed_tickers)} tickers missing. Saved to DLQ.")
 
@@ -141,7 +141,7 @@ class FinancialDataLoader:
             else:
                 self.logger.error(f"CRITICAL: Chunk {i//chunk_size} failed after {max_attempts} attempts. Skipping chunk to keep pipeline alive.")
                 dlq_df = pd.DataFrame({"failed_tickers": chunk})
-                dlq_csv = "data/processed/missed_tickers.csv"
+                dlq_csv = "..data/processed/missed_tickers.csv"
                 dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
         
 if __name__ == "__main__":
