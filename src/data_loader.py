@@ -4,6 +4,8 @@ import yfinance as yf
 import requests 
 import os
 import logging
+import time
+from tqdm import tqdm
 
 class FinancialDataLoader:
     
@@ -18,6 +20,8 @@ class FinancialDataLoader:
         os.makedirs(self.proc_data_dir, exist_ok=True)
         
 
+    # Downloads files from the internet
+    # REQUIRES a user header to get SEC filings
     def download_file(self, url: str, filename: str, headers: dict = {}) -> bool:
         save_path = os.path.join(self.raw_data_dir, filename)
 
@@ -42,7 +46,74 @@ class FinancialDataLoader:
         except Exception as e:
             self.logger.error(f"Failed to download {filename}: {e}")
             return False
-        
-    if __name__ == "data_loader.py":
+    
 
-        loader = FinancialDataLoader()
+   # Helper function to build raw company metric table
+    def _fetch_single_comp_metrics(self,ticker: str) -> dict:
+
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+
+            return {
+                "ticker": ticker,
+                
+                # Quantitative block for ML
+                "forwardPE": info.get("forwardPE"),
+                "ev_to_ebitda": info.get("enterpriseToEbitda"),
+                "ebitda_margin": info.get("ebitdaMargins"),
+                "debt_to_equity": info.get("debtToEquity"),
+                
+                # Qualitative block for ML
+                "sector": info.get("sector", "Unknown"),
+                "industry": info.get("industry", "Unknown"),
+                "business_summary": info.get("longBusinessSummary", ""),
+                
+                # Data for valuation
+                "ebitda": info.get("ebitda"),
+                "total_cash": info.get("totalCash"),
+                "total_debt": info.get("totalDebt"),
+                "shares_outstanding": info.get("sharesOutstanding")
+            }
+        except Exception as e:
+                self.logger.warning(f"Failed to fetch data for {ticker}: {e}")
+                return None
+
+    # Builds raw company metrics table
+    def build_csv_comps_table(self,raw_data_path: str, output_csv: str, chunk_size: int = 50, limit: int = None):
+        self.logger.info("Starting large data pull...")
+        df_raw = pd.read_json(raw_data_path, orient='index')
+        all_tickers = df_raw['ticker'].tolist()
+
+        if limit:
+            all_tickers = all_tickers[:limit]
+            self.logger.info(f"Test Mode: Only processing the first {limit} companies")
+        
+        # Check if a partial file already exists to resume
+        start_index = 0
+        if os.path.exists(output_csv):
+            existing_df = pd.read_csv(output_csv)
+            start_index = len(existing_df)
+            self.logger.info(f"Found existing file. Resuming from ticker {start_index}...")
+
+        for i in range(start_index, len(all_tickers), chunk_size):
+            chunk = all_tickers[i : i + chunk_size]
+            chunk_data = []
+            
+            for ticker in tqdm(chunk, desc=f"Chunk {i//chunk_size}", leave=False):
+                metrics = self._fetch_single_comp_metrics(ticker)
+                if metrics:
+                    chunk_data.append(metrics)
+            
+            # Save the chunk to the CSV 
+            if chunk_data:
+                chunk_df = pd.DataFrame(chunk_data)
+                # If file exists, append without headers. Otherwise, write new
+                chunk_df.to_csv(output_csv, mode='a', header=not os.path.exists(output_csv), index=False)
+            
+            time.sleep(2) # Safety pause
+        
+if __name__ == "data_loader.py":
+    loader = FinancialDataLoader()
+
+    loader.build_csv_comps_table("../data/raw/company_tickers.json", "../data/raw/company_metrics.csv")
