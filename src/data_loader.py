@@ -141,10 +141,10 @@ class FinancialDataLoader:
             else:
                 self.logger.error(f"CRITICAL: Chunk {i//chunk_size} failed after {max_attempts} attempts. Skipping chunk to keep pipeline alive.")
                 dlq_df = pd.DataFrame({"failed_tickers": chunk})
-                dlq_csv = "..data/processed/missed_tickers.csv"
+                dlq_csv = "../data/processed/missed_tickers.csv"
                 dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
         
 if __name__ == "__main__":
     loader = FinancialDataLoader()
 
-    loader.build_csv_comps_table("../data/raw/company_tickers.json", "../data/raw/company_metrics.csv")
+    loader.build_csv_comps_table("../data/raw/company_tickers.json", "../data/raw/company_metrics.csv", 100)
