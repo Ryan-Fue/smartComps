@@ -80,7 +80,8 @@ class FinancialDataLoader:
                 return None
 
     # Builds raw company metrics table
-    def build_csv_comps_table(self,raw_data_path: str, output_csv: str, chunk_size: int = 50, limit: int = None):
+    def build_csv_comps_table(self,raw_data_path: str, output_csv: str, chunk_size: int = 50, limit: int = None) -> bool:
+
         self.logger.info("Starting large data pull...")
         df_raw = pd.read_json(raw_data_path, orient='index')
         all_tickers = df_raw['ticker'].tolist()
@@ -143,7 +144,37 @@ class FinancialDataLoader:
                 dlq_df = pd.DataFrame({"failed_tickers": chunk})
                 dlq_csv = "../data/processed/missed_tickers.csv"
                 dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
-        
+
+        return True
+
+
+    def clean_csv_comps_table(self, raw_data_path: str, output_parquet: str) -> bool:
+
+        df = pd.read_csv(raw_data_path)
+
+        # Irrecoverable data
+        df = df.dropna(subset=["ebitda", "sector", "industry", "shares_outstanding", "business_summary"])
+        df["total_debt"] = df["total_debt"].fillna(0)
+        df["total_cash"] = df["total_cash"].fillna(0)
+
+        # Adding more robust debt_to_ebitda metric
+        df["debt_to_ebitda"] = df["total_debt"] / df["ebitda"]
+        df = df.drop(columns=["debt_to_equity"])
+
+        # Conditional fill to account for ev_to_ebita ratios that are because of negative EBDITA vs just missing
+        df.loc[df["ebitda"] <= 0, "ev_to_ebitda"] = df.loc[df["ebitda"] <= 0, "ev_to_ebitda"].fillna(0)
+        df["ev_to_ebitda"] = df.groupby("sector")["ev_to_ebitda"].transform(lambda x: x.fillna(x.median()))
+        df["forwardPE"] = df.groupby("sector")["forwardPE"].transform(lambda x: x.fillna(x.median()))
+        df = df.dropna(subset=["ev_to_ebitda", "forwardPE"])
+
+        df = df.reset_index(drop=True)
+
+        df.to_parquet(output_parquet, index=False)
+
+        return True
+
+
+
 if __name__ == "__main__":
 
     logging.basicConfig(
