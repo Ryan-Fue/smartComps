@@ -130,13 +130,13 @@ class FinancialDataLoader:
                 # Dead letter queue (DQL)
                 if missed_tickers:
                     dlq_df = pd.DataFrame({"failed_tickers": missed_tickers})
-                    dlq_csv = "..data/processed/missed_tickers.csv"
+                    dlq_csv = "../data/processed/missed_tickers.csv"
                     dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
                     self.logger.info(f"Chunk {i//chunk_size}: {len(missed_tickers)} tickers missing. Saved to DLQ.")
 
                 # If file exists, append without headers. Otherwise, write new
                 chunk_df.to_csv(output_csv, mode='a', header=not os.path.exists(output_csv), index=False)
-                time.sleep(2) # Safety pause
+                time.sleep(10) # Safety pause
 
             else:
                 self.logger.error(f"CRITICAL: Chunk {i//chunk_size} failed after {max_attempts} attempts. Skipping chunk to keep pipeline alive.")
@@ -145,6 +145,14 @@ class FinancialDataLoader:
                 dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
         
 if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO, 
+        filename = "log.log", 
+        filemode = "w", 
+        format = "%(asctime)s - %(levelname)s - %(message)s"
+    )
+
     loader = FinancialDataLoader()
 
     loader.build_csv_comps_table("../data/raw/company_tickers.json", "../data/raw/company_metrics.csv", 100)
