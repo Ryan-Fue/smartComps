@@ -150,26 +150,31 @@ class FinancialDataLoader:
 
     def clean_csv_comps_table(self, raw_data_path: str, output_parquet: str) -> bool:
 
+        self.logger.info("Starting data cleaning process...")
         df = pd.read_csv(raw_data_path)
 
         # Irrecoverable data
         df = df.dropna(subset=["ebitda", "sector", "industry", "shares_outstanding", "business_summary"])
         df["total_debt"] = df["total_debt"].fillna(0)
         df["total_cash"] = df["total_cash"].fillna(0)
+        self.logger.info("Removed entries with irrecoverable data")
 
         # Adding more robust debt_to_ebitda metric
         df["debt_to_ebitda"] = df["total_debt"] / df["ebitda"]
         df = df.drop(columns=["debt_to_equity"])
+        self.logger.info("Generated debt_to_ebita column")
 
         # Conditional fill to account for ev_to_ebita ratios that are because of negative EBDITA vs just missing
         df.loc[df["ebitda"] <= 0, "ev_to_ebitda"] = df.loc[df["ebitda"] <= 0, "ev_to_ebitda"].fillna(0)
         df["ev_to_ebitda"] = df.groupby("sector")["ev_to_ebitda"].transform(lambda x: x.fillna(x.median()))
         df["forwardPE"] = df.groupby("sector")["forwardPE"].transform(lambda x: x.fillna(x.median()))
         df = df.dropna(subset=["ev_to_ebitda", "forwardPE"])
+        self.logger.info("Generated debt_to_ebita column")
 
         df = df.reset_index(drop=True)
 
         df.to_parquet(output_parquet, index=False)
+        self.logger.info("Stored cleaned dataframe to parquet")
 
         return True
 
