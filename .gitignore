@@ -38,3 +38,6 @@ data/
 .env
 .DS_Store
 EOT
+
+# Gemini CLI
+GEMINI.md
