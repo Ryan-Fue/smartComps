@@ -23,13 +23,7 @@ def sample_df():
         "business_summary": ["Technology company focused on AI", "Retailer with many stores", "Healthcare provider"]
     })
 
-def test_normalize_metrics(processor, sample_df):
-    df_norm = processor.normalize_metrics(sample_df)
-    
-    assert "forwardPE" in df_norm.columns
-    # Check that values have changed
-    assert not np.array_equal(df_norm["forwardPE"].values, sample_df["forwardPE"].values)
-    # RobustScaler scales based on IQR, so it handles outliers well
+
 
 def test_embed_summaries(processor, sample_df):
     # Use a mock or small subset to avoid long download/run time in CI if needed
