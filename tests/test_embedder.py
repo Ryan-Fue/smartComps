@@ -35,9 +35,23 @@ def test_embed_summaries(processor, sample_df):
     # Use a mock or small subset to avoid long download/run time in CI if needed
     # But here we assume local run is fine
     df_emb = processor.embed_summaries(sample_df.head(2))
+
+    # Make list of nlp columns
+    nlp_columns = [col for col in df_emb.columns if col.startswith("nlp_")]
     
-    assert "embeddings" in df_emb.columns
-    assert len(df_emb.iloc[0]["embeddings"]) == 384 # Shape for all-MiniLM-L6-v2
+    assert "nlp_0" in df_emb.columns
+    assert "nlp_383" in df_emb.columns
+    assert len(nlp_columns) == 384 # Shape for all-MiniLM-L6-v2
+
+
+def test_drop_extra_columns(processor, sample_df):
+
+    df = processor.drop_extra_columns(sample_df)
+
+    extra_columns = ["ticker", "sector", "industry", "business_summary"]
+
+    for col in extra_columns:
+        assert col not in df.columns
 
 def test_process_pipeline(processor, sample_df, tmp_path):
     input_path = tmp_path / "input.parquet"
@@ -50,5 +64,6 @@ def test_process_pipeline(processor, sample_df, tmp_path):
     assert result is True
     assert os.path.exists(output_path)
     df_processed = pd.read_parquet(output_path)
-    assert "embeddings" in df_processed.columns
+    nlp_cols = ["nlp_" + str(i) for i in range(384)]
+    assert set(nlp_cols).issubset(df_processed.columns)
     assert "forwardPE" in df_processed.columns

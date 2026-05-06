@@ -64,10 +64,31 @@ class FeatureProcessor:
         summaries = df[text_col].fillna("").tolist()
         embeddings = self.model.encode(summaries, show_progress_bar=True)
         
-        # Convert embeddings to a list of arrays to store in DataFrame
-        df["embeddings"] = list(embeddings)
+        # Make flattened embedding dataframe
+        embedding_df = pd.DataFrame(list(embeddings), index=df.index)
+        embedding_df = embedding_df.add_prefix("nlp_")
+        self.logger.info(f"Generated columns for: {text_col}...")
+
+        # Merge embedding_df with main DataFrame
+        df = df.join(embedding_df)
         
-        self.logger.info("Successfully generated embeddings.")
+        self.logger.info("Successfully appended embeddings.")
+        return df
+    
+
+    def drop_extra_columns(self, df: pd.DataFrame, extra_col: list = None) -> pd.DataFrame:
+        if extra_col is None:
+            extra_col = ["ticker", "sector", "industry", "business_summary", "embeddings"]
+        
+        missing_cols = [col for col in extra_col if col not in df.columns]
+        for col in missing_cols:
+            self.logger.warning(f"Failed to find {col}")
+
+        # 2. Safely drop whatever is in the list without crashing
+        df = df.drop(columns=extra_col, errors='ignore')
+
+        self.logger.info("Successfully dropped extra columns.")
+
         return df
 
     def process_pipeline(self, input_path: str, output_path: str) -> bool:
@@ -83,8 +104,11 @@ class FeatureProcessor:
             
             # 2. Embed
             df_processed = self.embed_summaries(df_processed)
+
+            # 3. Drop Extra Columns
+            df_processed = self.drop_extra_columns(df_processed)
             
-            # 3. Save
+            # 4. Save
             self.logger.info(f"Saving processed data to {output_path}...")
             df_processed.to_parquet(output_path, index=False)
             
@@ -93,6 +117,8 @@ class FeatureProcessor:
         except Exception as e:
             self.logger.error(f"Failed to process pipeline: {e}")
             return False
+        
+    
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -109,10 +135,12 @@ if __name__ == "__main__":
 
     processor = FeatureProcessor()
     
+    # Ensure paths are relative to the project root
     input_file = "data/processed/company_metrics_clean.parquet"
     output_file = "data/processed/company_metrics_ml.parquet"
     
     if os.path.exists(input_file):
         processor.process_pipeline(input_file, output_file)
+        print(f"Pipeline complete. Processed data saved to {output_file}")
     else:
         print(f"Input file {input_file} not found. Please run data_loader.py first.")
