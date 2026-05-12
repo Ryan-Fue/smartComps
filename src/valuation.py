@@ -37,13 +37,31 @@ class ValuationEngine:
 
         preprocessor = ColumnTransformer([
             ("fin_prep", Pipeline([
-                ("inputer")
+                ("inputer", KNNImputer(n_neighbors = 5, weights = 'distance')),
+                ("scalar", RobustScaler())
+            ]), self.fin_cols),
 
-            ]))
+                ("nlp_prep", PCA(n_components=10, random_state=random_state), self.nlp_cols)
 
+            ])
+        
+        # Multi target model
+        model = MultiOutputRegressor(
+            xgb.XGBRegressor(
+                n_estimators=n_estimators,
+                learning_rate=0.1,
+                max_depth=5,
+                random_state=random_state,
+                n_jobs=-1
+            )
+        )
 
-
+        # Combine into master pipeline
+        return Pipeline([
+            ('preprocess', preprocessor),
+            ('model', model)
         ])
+
 
     def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame):
         pass
