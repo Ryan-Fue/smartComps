@@ -141,3 +141,27 @@ def test_infinite_value_handling(mock_ml_data):
         engine.train(X, y)
     except ValueError as e:
         pytest.fail(f"Training failed with infinite values handled as NaNs: {e}")
+
+def test_hyperparameter_tuning(mock_ml_data):
+    """Verifies that the hyperparameter tuning pipeline works correctly."""
+    engine = ValuationEngine(mode="public")
+    X, y = engine.prepare_data(mock_ml_data, target_col="enterprise_value")
+    
+    # Use a minimal grid for fast testing
+    test_grid = {
+        "preprocess__nlp_prep__n_components": [2, 5],
+        "model__estimator__n_estimators": [10]
+    }
+    
+    initial_pipeline = engine.pipeline
+    
+    # Run tuning
+    best_params = engine.tune_hyperparameters(X, y, param_distributions=test_grid, n_iter=2, cv=2)
+    
+    assert isinstance(best_params, dict)
+    assert "preprocess__nlp_prep__n_components" in best_params
+    assert engine.pipeline != initial_pipeline
+    
+    # Verify the tuned model can still predict
+    preds = engine.predict(X)
+    assert preds.shape == (20, 1)

@@ -11,6 +11,7 @@ from sklearn.impute import KNNImputer
 from sklearn.decomposition import PCA
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import r2_score, mean_absolute_error
+from sklearn.model_selection import RandomizedSearchCV, KFold
 
 
 class ValuationEngine:
@@ -154,6 +155,52 @@ class ValuationEngine:
             self.pipeline.fit(X_train, y_train)
             pbar.update(1)
         self.logger.info("Training complete.")
+
+    def tune_hyperparameters(self, 
+                             X_train: pd.DataFrame, 
+                             y_train: pd.DataFrame, 
+                             param_distributions: dict = None, 
+                             n_iter: int = 10, 
+                             cv: int = 5, 
+                             scoring: str = "r2") -> dict:
+        """
+        Conducts a randomized search for optimal hyperparameters across the pipeline.
+        Updates self.pipeline with the best estimator found.
+        """
+        self.logger.info(f"Starting hyperparameter tuning (n_iter={n_iter}, cv={cv})...")
+
+        if param_distributions is None:
+            param_distributions = {
+                "preprocess__nlp_prep__n_components": [10, 30, 50, 100],
+                "preprocess__fin_prep__imputer__n_neighbors": [3, 5, 10],
+                "model__estimator__max_depth": [3, 5, 7, 10],
+                "model__estimator__learning_rate": [0.01, 0.05, 0.1, 0.2],
+                "model__estimator__n_estimators": [100, 200, 300, 500]
+            }
+
+        search = RandomizedSearchCV(
+            estimator=self.pipeline,
+            param_distributions=param_distributions,
+            n_iter=n_iter,
+            cv=KFold(n_splits=cv, shuffle=True, random_state=self.random_state),
+            scoring=scoring,
+            random_state=self.random_state,
+            n_jobs=-1,
+            verbose=1
+        )
+
+        with tqdm(total=1, desc="Tuning Hyperparameters") as pbar:
+            search.fit(X_train, y_train)
+            pbar.update(1)
+
+        self.logger.info(f"Tuning complete. Best Score ({scoring}): {search.best_score_:.4f}")
+        self.logger.info(f"Best Parameters: {search.best_params_}")
+
+        # Update the master pipeline with the best version
+        self.pipeline = search.best_estimator_
+        self.model = self.pipeline
+        
+        return search.best_params_
 
     def predict(self, X_new: pd.DataFrame) -> pd.DataFrame:
         """Generates predictions for new data."""
