@@ -4,14 +4,15 @@ import numpy as np
 import xgboost as xgb
 import joblib
 from tqdm import tqdm
+from scipy.stats import loguniform, randint
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
-from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import RobustScaler, TargetEncoder
 from sklearn.impute import KNNImputer
 from sklearn.decomposition import PCA
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_log_error
-from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, KFold
+from sklearn.model_selection import RandomizedSearchCV, KFold
 
 def safe_expm1(x):
     """Inverse log transform that guarantees results >= 0 for mathematical stability."""
@@ -27,11 +28,13 @@ class ValuationEngine:
     # Default feature sets for different company types
     PUBLIC_FIN_COLS = ["forwardPE", "ev_to_ebitda", "ebitda", "total_cash", "total_debt"]
     PRIVATE_FIN_COLS = ["employee_count", "estimated_revenue"]
+    CAT_COLS = ["sector"]
 
     def __init__(self, 
                  mode: str = "public", 
                  fin_cols: list = None, 
                  nlp_cols: list = None, 
+                 cat_cols: list = None,
                  target_cols: list = None, 
                  n_estimators: int = 150, 
                  random_state: int = 42) -> None:
@@ -57,16 +60,20 @@ class ValuationEngine:
         else:
             self.base_nlp_cols = [f"nlp_{i}" for i in range(384)]
 
-        # 3. Determine Target Columns
+        # 3. Determine Base Categorical Columns
+        self.base_cat_cols = cat_cols if cat_cols is not None else self.CAT_COLS
+
+        # 4. Determine Target Columns
         self.target_cols = target_cols if target_cols else ["enterprise_value"]
         
-        # 4. Initialize features and pipeline
+        # 5. Initialize features and pipeline
         self._update_features_and_pipeline()
 
     def _update_features_and_pipeline(self) -> None:
         """Filters base features against target_cols and rebuilds the pipeline."""
         self.fin_cols = [c for c in self.base_fin_cols if c not in self.target_cols]
         self.nlp_cols = [c for c in self.base_nlp_cols if c not in self.target_cols]
+        self.cat_cols = [c for c in self.base_cat_cols if c not in self.target_cols]
         
         # Rebuild the pipeline
         self.pipeline = self._build_pipeline(self.n_estimators, self.random_state)
@@ -75,13 +82,14 @@ class ValuationEngine:
     def _build_pipeline(self, n_estimators: int, random_state: int = 42) -> Pipeline:
         """Constructs the Scikit-Learn pipeline with log-transformed targets."""
         
-        # Preprocessor for financial and NLP data
+        # Preprocessor for financial, categorical, and NLP data
         preprocessor = ColumnTransformer([
             ("fin_prep", Pipeline([
                 ("scaler", RobustScaler()),
                 ("imputer", KNNImputer(n_neighbors=5, weights='distance'))
             ]), self.fin_cols),
-            ("nlp_prep", PCA(n_components=10, random_state=random_state), self.nlp_cols)
+            ("cat_prep", TargetEncoder(random_state=random_state), self.cat_cols),
+            ("nlp_prep", PCA(n_components=30, random_state=random_state), self.nlp_cols)
         ])
         
         # Base XGBoost model wrapped for multi-output
@@ -120,14 +128,19 @@ class ValuationEngine:
             
         available_fin = [c for c in self.fin_cols if c in df.columns]
         available_nlp = [c for c in self.nlp_cols if c in df.columns]
+        available_cat = [c for c in self.cat_cols if c in df.columns]
         
-        X = df[available_fin + available_nlp].copy()
+        X = df[available_fin + available_cat + available_nlp].copy()
         y = df[self.target_cols].copy()
 
         # Handle infinite and extreme values
         X.replace([np.inf, -np.inf], np.nan, inplace=True)
         y.replace([np.inf, -np.inf], np.nan, inplace=True)
-        X = X.clip(lower=-1e15, upper=1e15)
+        
+        # Clip numerical features only
+        num_cols = available_fin + available_nlp
+        X[num_cols] = X[num_cols].clip(lower=-1e15, upper=1e15)
+        
         y = y.clip(lower=0, upper=1e15) # Log requires target >= 0
         
         return X, y
@@ -136,9 +149,12 @@ class ValuationEngine:
         """Trains the valuation model."""
         self.logger.info(f"Training model on {len(X_train)} samples...")
         
-        expected_cols = self.fin_cols + self.nlp_cols
+        expected_cols = self.fin_cols + self.cat_cols + self.nlp_cols
         if not all(c in X_train.columns for c in expected_cols):
-            raise ValueError("X_train missing columns expected by pipeline.")
+            self.logger.warning(f"X_train missing columns. Expected: {expected_cols}, Found: {X_train.columns.tolist()}")
+            # Attempt to fit anyway if some expected columns are missing but available in data
+            available_cols = [c for c in expected_cols if c in X_train.columns]
+            X_train = X_train[available_cols]
 
         with tqdm(total=1, desc="Training Model") as pbar:
             self.pipeline.fit(X_train, y_train)
@@ -148,20 +164,22 @@ class ValuationEngine:
                              X_train: pd.DataFrame, 
                              y_train: pd.DataFrame, 
                              param_distributions: dict = None, 
-                             n_iter: int = 10, 
+                             n_iter: int = 50, 
                              cv: int = 5, 
-                             scoring: str = "neg_mean_absolute_error",
+                             scoring: str = "neg_mean_squared_log_error",
                              n_jobs: int = -1) -> dict:
-        """Conducts hyperparameter tuning using randomized search."""
+        """Conducts hyperparameter tuning using randomized search with robust distributions."""
         self.logger.info(f"Tuning hyperparameters (n_iter={n_iter}, cv={cv}, n_jobs={n_jobs})...")
 
         if param_distributions is None:
             param_distributions = {
-                "preprocess__nlp_prep__n_components": [10, 30, 50, 100],
-                "preprocess__fin_prep__imputer__n_neighbors": [3, 5, 10],
-                "model__regressor__estimator__max_depth": [3, 5, 7],
-                "model__regressor__estimator__learning_rate": [0.01, 0.1, 0.2],
-                "model__regressor__estimator__n_estimators": [100, 300, 500]
+                "preprocess__nlp_prep__n_components": randint(10, 100),
+                "preprocess__fin_prep__imputer__n_neighbors": randint(3, 15),
+                "model__regressor__estimator__max_depth": randint(3, 10),
+                "model__regressor__estimator__learning_rate": loguniform(1e-3, 0.3),
+                "model__regressor__estimator__n_estimators": randint(100, 1000),
+                "model__regressor__estimator__subsample": loguniform(0.5, 1.0),
+                "model__regressor__estimator__colsample_bytree": loguniform(0.5, 1.0)
             }
 
         search = RandomizedSearchCV(
@@ -192,7 +210,7 @@ class ValuationEngine:
         return pd.DataFrame(preds, columns=self.target_cols, index=X_new.index)
 
     def evaluate(self, X: pd.DataFrame, y: pd.DataFrame) -> dict[str, float]:
-        """Evaluates the model and returns robust metrics."""
+        """Evaluates the model and returns robust relative and absolute metrics."""
         preds_df = self.predict(X)
         preds = preds_df.values
         
@@ -200,13 +218,18 @@ class ValuationEngine:
         preds = np.clip(preds, 0, None)
         y_val = y.values
         
+        # Calculate relative errors (using actual+1 to avoid div by zero)
+        abs_pct_error = np.abs((y_val - preds) / (y_val + 1))
+        
         # Ensure targets are clipped to positive for RMSLE calculation safety
         y_val_clipped = np.clip(y_val, 0, None)
         
         metrics = {
             "r2": r2_score(y_val, preds),
             "mae": mean_absolute_error(y_val, preds),
-            "mape": mean_absolute_percentage_error(y_val + 1, preds + 1), # Avoid div by zero
+            "mape": mean_absolute_percentage_error(y_val + 1, preds + 1),
+            "mdape": np.median(abs_pct_error),  # Median Absolute Percentage Error
+            "accuracy_20": np.mean(abs_pct_error < 0.20), # Hit rate within 20%
             "rmsle": root_mean_squared_log_error(y_val_clipped, preds)
         }
         self.logger.info(f"Evaluation Metrics: {metrics}")
@@ -223,4 +246,4 @@ class ValuationEngine:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    print("Valuation Engine Module Loaded.")
+    print("Valuation Engine Module Upgraded.")

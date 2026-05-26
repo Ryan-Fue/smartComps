@@ -112,7 +112,7 @@ if __name__ == "__main__":
     # Drops sector as it has minimal impact on hard financial multiples
     public_in = os.path.join(root, "data", "processed", "PUBLIC_training.parquet")
     public_out = os.path.join(root, "data", "processed", "PUBLIC_embedded.parquet")
-    public_drop = ["ticker", "sector", "business_summary", "employee_count", "estimated_revenue"]
+    public_drop = ["ticker", "business_summary", "employee_count", "estimated_revenue"]
     
     if os.path.exists(public_in):
         success = processor.process_pipeline(public_in, public_out, drop_cols=public_drop)
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # Drops sector as private input data is often noisy or missing these headers
     private_in = os.path.join(root, "data", "processed", "PRIVATE_training.parquet")
     private_out = os.path.join(root, "data", "processed", "PRIVATE_embedded.parquet")
-    private_drop = ["ticker", "sector", "business_summary"]
+    private_drop = ["ticker", "business_summary"]
     
     if os.path.exists(private_in):
         success = processor.process_pipeline(private_in, private_out, drop_cols=private_drop)
