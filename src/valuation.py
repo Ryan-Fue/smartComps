@@ -8,7 +8,7 @@ from scipy.stats import loguniform, randint
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
 from sklearn.preprocessing import RobustScaler, TargetEncoder, FunctionTransformer
-from sklearn.impute import KNNImputer
+from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.decomposition import PCA
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_log_error
@@ -89,17 +89,21 @@ class ValuationEngine:
         # Preprocessor for financial, categorical, and NLP data
         preprocessor = ColumnTransformer([
             ("fin_prep", Pipeline([
-                ("log", FunctionTransformer(log_transform, validate=True)),
+                ("log", FunctionTransformer(log_transform, validate=False)),
                 ("scaler", RobustScaler()),
                 ("imputer", KNNImputer(n_neighbors=5, weights='distance'))
             ]), self.fin_cols),
-            # Explicitly set target_type='continuous' to avoid incorrect stratification errors
-            ("cat_prep", TargetEncoder(target_type='continuous', random_state=random_state), self.cat_cols),
-            ("nlp_prep", PCA(n_components=30, random_state=random_state), self.nlp_cols)
+            ("cat_prep", Pipeline([
+                ("imputer", SimpleImputer(strategy='constant', fill_value='Unknown')),
+                ("encoder", TargetEncoder(target_type='continuous', random_state=random_state))
+            ]), self.cat_cols),
+            ("nlp_prep", Pipeline([
+                ("imputer", SimpleImputer(strategy='mean')),
+                ("pca", PCA(n_components=30, random_state=random_state))
+            ]), self.nlp_cols)
         ])
         
         # Base XGBoost model wrapped for multi-output
-        # increased min_child_weight and conservative max_depth to handle mega-caps better
         base_model = MultiOutputRegressor(
             xgb.XGBRegressor(
                 n_estimators=n_estimators,
@@ -145,6 +149,13 @@ class ValuationEngine:
         X.replace([np.inf, -np.inf], np.nan, inplace=True)
         y.replace([np.inf, -np.inf], np.nan, inplace=True)
         
+        # Drop rows where target is NaN
+        nan_targets = y.isna().any(axis=1)
+        if nan_targets.any():
+            self.logger.warning(f"Dropping {nan_targets.sum()} rows with NaN targets.")
+            X = X[~nan_targets]
+            y = y[~nan_targets]
+        
         # Clip numerical features only
         num_cols = available_fin + available_nlp
         X[num_cols] = X[num_cols].clip(lower=-1e15, upper=1e15)
@@ -158,11 +169,8 @@ class ValuationEngine:
         self.logger.info(f"Training model on {len(X_train)} samples...")
         
         expected_cols = self.fin_cols + self.cat_cols + self.nlp_cols
-        if not all(c in X_train.columns for c in expected_cols):
-            self.logger.warning(f"X_train missing columns. Expected: {expected_cols}, Found: {X_train.columns.tolist()}")
-            # Attempt to fit anyway if some expected columns are missing but available in data
-            available_cols = [c for c in expected_cols if c in X_train.columns]
-            X_train = X_train[available_cols]
+        available_cols = [c for c in expected_cols if c in X_train.columns]
+        X_train = X_train[available_cols]
 
         with tqdm(total=1, desc="Training Model") as pbar:
             self.pipeline.fit(X_train, y_train)
@@ -181,7 +189,7 @@ class ValuationEngine:
 
         if param_distributions is None:
             param_distributions = {
-                "preprocess__nlp_prep__n_components": randint(10, 100),
+                "preprocess__nlp_prep__pca__n_components": randint(10, 100),
                 "preprocess__fin_prep__imputer__n_neighbors": randint(3, 15),
                 "model__regressor__estimator__max_depth": randint(3, 10),
                 "model__regressor__estimator__learning_rate": loguniform(1e-3, 0.3),
@@ -189,8 +197,6 @@ class ValuationEngine:
                 "model__regressor__estimator__subsample": loguniform(0.5, 1.0),
                 "model__regressor__estimator__colsample_bytree": loguniform(0.5, 1.0)
             }
-
-            
 
         search = RandomizedSearchCV(
             estimator=self.pipeline,
@@ -214,7 +220,6 @@ class ValuationEngine:
     def predict(self, X_new: pd.DataFrame) -> pd.DataFrame:
         """Generates predictions and ensures they are formatted as a DataFrame."""
         preds = self.pipeline.predict(X_new)
-        # Ensure preds is 2D for consistent DataFrame construction
         if preds.ndim == 1:
             preds = preds.reshape(-1, 1)
         return pd.DataFrame(preds, columns=self.target_cols, index=X_new.index)
@@ -224,22 +229,19 @@ class ValuationEngine:
         preds_df = self.predict(X)
         preds = preds_df.values
         
-        # Enforce non-negativity for metrics
         preds = np.clip(preds, 0, None)
         y_val = y.values
         
-        # Calculate relative errors (using actual+1 to avoid div by zero)
         abs_pct_error = np.abs((y_val - preds) / (y_val + 1))
         
-        # Ensure targets are clipped to positive for RMSLE calculation safety
         y_val_clipped = np.clip(y_val, 0, None)
         
         metrics = {
             "r2": r2_score(y_val, preds),
             "mae": mean_absolute_error(y_val, preds),
             "mape": mean_absolute_percentage_error(y_val + 1, preds + 1),
-            "mdape": np.median(abs_pct_error),  # Median Absolute Percentage Error
-            "accuracy_20": np.mean(abs_pct_error < 0.20), # Hit rate within 20%
+            "mdape": np.median(abs_pct_error),
+            "accuracy_20": np.mean(abs_pct_error < 0.20),
             "rmsle": root_mean_squared_log_error(y_val_clipped, preds)
         }
         self.logger.info(f"Evaluation Metrics: {metrics}")
