@@ -13,7 +13,9 @@ class FeatureProcessor:
         self.logger = logging.getLogger(__name__)
         self.model = SentenceTransformer(model_name)
         
-        self.proc_data_dir = "data/processed"
+        # Define project root relative to this file (src/embedder.py)
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.proc_data_dir = os.path.join(self.project_root, "data", "processed")
         os.makedirs(self.proc_data_dir, exist_ok=True)
 
     def embed_summaries(self, df: pd.DataFrame, text_col: str = "business_summary") -> pd.DataFrame:
@@ -96,10 +98,11 @@ if __name__ == "__main__":
     logging.getLogger("").addHandler(console)
 
     processor = FeatureProcessor()
+    root = processor.project_root
     
     # Ensure paths are relative to the project root
-    input_file = "data/processed/company_metrics_clean.parquet"
-    output_file = "data/processed/company_metrics_ml.parquet"
+    input_file = os.path.join(root, "data", "processed", "company_metrics_clean.parquet")
+    output_file = os.path.join(root, "data", "processed", "company_metrics_ml.parquet")
     
     if os.path.exists(input_file):
         processor.process_pipeline(input_file, output_file)

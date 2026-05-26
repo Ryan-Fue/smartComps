@@ -12,9 +12,12 @@ class FinancialDataLoader:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
-        # Paths are now relative to project root
-        self.raw_data_dir = "data/raw"
-        self.proc_data_dir = "data/processed"
+        # Define project root relative to this file (src/data_loader.py)
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Paths are now absolute to project root
+        self.raw_data_dir = os.path.join(self.project_root, "data", "raw")
+        self.proc_data_dir = os.path.join(self.project_root, "data", "processed")
 
         # Make sure directories exist
         os.makedirs(self.raw_data_dir, exist_ok=True)
@@ -137,7 +140,7 @@ class FinancialDataLoader:
                 # Dead letter queue (DQL)
                 if missed_tickers:
                     dlq_df = pd.DataFrame({"failed_tickers": missed_tickers})
-                    dlq_csv = "data/processed/missed_tickers.csv"
+                    dlq_csv = os.path.join(self.proc_data_dir, "missed_tickers.csv")
                     dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
                     self.logger.info(f"Chunk {i//chunk_size}: {len(missed_tickers)} tickers missing. Saved to DLQ.")
 
@@ -148,7 +151,7 @@ class FinancialDataLoader:
             else:
                 self.logger.error(f"CRITICAL: Chunk {i//chunk_size} failed after {max_attempts} attempts. Skipping chunk to keep pipeline alive.")
                 dlq_df = pd.DataFrame({"failed_tickers": chunk})
-                dlq_csv = "data/processed/missed_tickers.csv"
+                dlq_csv = os.path.join(self.proc_data_dir, "missed_tickers.csv")
                 dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
 
         return True
@@ -219,17 +222,18 @@ if __name__ == "__main__":
     )
 
     loader = FinancialDataLoader()
+    root = loader.project_root
 
     # SEC Download logic
     sec_url = "https://www.sec.gov/files/company_tickers.json"
     headers = {"User-Agent": "Ryan Fue rfue29@gmail.com"}
     loader.download_file(sec_url, "company_tickers.json", headers=headers)
 
-    master_file = "data/raw/master_metrics.csv"
-    raw_tickers_path = "data/raw/company_tickers.json"
+    master_file = os.path.join(root, "data", "raw", "master_metrics.csv")
+    raw_tickers_path = os.path.join(root, "data", "raw", "company_tickers.json")
 
-    # Use a small limit for verification
-    loader.build_raw_master_table(raw_tickers_path, master_file, limit=5)
+    # Full data pull (no limit)
+    loader.build_raw_master_table(raw_tickers_path, master_file, limit=None)
 
-    loader.build_public_training_table(master_file, "data/processed/PUBLIC_training.parquet")
-    loader.build_private_training_table(master_file, "data/processed/PRIVATE_training.parquet")
+    loader.build_public_training_table(master_file, os.path.join(root, "data", "processed", "PUBLIC_training.parquet"))
+    loader.build_private_training_table(master_file, os.path.join(root, "data", "processed", "PRIVATE_training.parquet"))
