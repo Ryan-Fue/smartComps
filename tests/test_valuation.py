@@ -150,7 +150,7 @@ def test_hyperparameter_tuning(mock_ml_data):
     # Use a minimal grid for fast testing
     test_grid = {
         "preprocess__nlp_prep__n_components": [2, 5],
-        "model__estimator__n_estimators": [10]
+        "model__regressor__estimator__n_estimators": [10]
     }
     
     initial_pipeline = engine.pipeline

@@ -5,12 +5,12 @@ import xgboost as xgb
 import joblib
 from tqdm import tqdm
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
+from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
 from sklearn.preprocessing import RobustScaler
 from sklearn.impute import KNNImputer
 from sklearn.decomposition import PCA
 from sklearn.multioutput import MultiOutputRegressor
-from sklearn.metrics import r2_score, mean_absolute_error
+from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_log_error
 from sklearn.model_selection import RandomizedSearchCV, KFold
 
 
@@ -48,7 +48,7 @@ class ValuationEngine:
         self.random_state = random_state
         self.n_estimators = n_estimators
 
-        # 1. Determine Financial Columns
+        # 1. Determine Base Financial Columns
         if fin_cols is not None:
             self.base_fin_cols = fin_cols
         elif mode == "public":
@@ -58,7 +58,7 @@ class ValuationEngine:
         else: # hybrid
             self.base_fin_cols = self.PUBLIC_FIN_COLS + self.PRIVATE_FIN_COLS
 
-        # 2. Determine NLP Columns (default to 384 if not specified)
+        # 2. Determine Base NLP Columns (default to 384 if not specified)
         if nlp_cols is not None:
             self.base_nlp_cols = nlp_cols
         else:
@@ -80,7 +80,7 @@ class ValuationEngine:
         self.model = self.pipeline  # Maintain alias
 
     def _build_pipeline(self, n_estimators: int, random_state: int = 42) -> Pipeline:
-        """Constructs the Scikit-Learn pipeline."""
+        """Constructs the Scikit-Learn pipeline with log-transformed targets."""
         
         # Preprocessor for financial and NLP data
         preprocessor = ColumnTransformer([
@@ -91,8 +91,8 @@ class ValuationEngine:
             ("nlp_prep", PCA(n_components=10, random_state=random_state), self.nlp_cols)
         ])
         
-        # Multi-target XGBoost model
-        model = MultiOutputRegressor(
+        # Base Multi-target XGBoost model
+        base_model = MultiOutputRegressor(
             xgb.XGBRegressor(
                 n_estimators=n_estimators,
                 learning_rate=0.1,
@@ -100,6 +100,15 @@ class ValuationEngine:
                 random_state=random_state,
                 n_jobs=-1
             )
+        )
+
+        # Wrap in TransformedTargetRegressor to handle log scaling of targets automatically
+        # This guarantees positive predictions and improves stability on skewed financial data.
+        # We use log1p/expm1 to handle small positive values safely.
+        model = TransformedTargetRegressor(
+            regressor=base_model,
+            func=np.log1p,
+            inverse_func=np.expm1
         )
 
         # Combine into master pipeline
@@ -111,7 +120,7 @@ class ValuationEngine:
     def prepare_data(self, df: pd.DataFrame, target_col: str = None) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Filters and splits the dataframe into features (X) and target (y).
-        If target_col is provided, it updates the internal state if different from current target.
+        Ensures data is cleaned for log-transformation compatibility.
         """
         self.logger.info("Preparing data for modeling...")
         
@@ -135,9 +144,13 @@ class ValuationEngine:
         y.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         # 2. Cap extremely large values to prevent numerical overflow in downstream models
-        # 1e15 (quadrillion) is a safe upper bound for financial metrics
         X = X.clip(lower=-1e15, upper=1e15)
         y = y.clip(lower=-1e15, upper=1e15)
+        
+        # 3. CRITICAL: For Log-Transform, targets MUST be > -1. 
+        # Since we filter for positive enterprise value in the notebook, 
+        # we enforce a floor of 0 here to prevent math errors.
+        y = y.clip(lower=0)
         
         return X, y
 
@@ -173,11 +186,12 @@ class ValuationEngine:
             param_distributions = {
                 "preprocess__nlp_prep__n_components": [10, 30, 50, 100],
                 "preprocess__fin_prep__imputer__n_neighbors": [3, 5, 10],
-                "model__estimator__max_depth": [3, 5, 7, 10],
-                "model__estimator__learning_rate": [0.01, 0.05, 0.1, 0.2],
-                "model__estimator__n_estimators": [100, 200, 300, 500]
+                "model__regressor__estimator__max_depth": [3, 5, 7, 10],
+                "model__regressor__estimator__learning_rate": [0.01, 0.05, 0.1, 0.2],
+                "model__regressor__estimator__n_estimators": [100, 200, 300, 500]
             }
 
+        # Use KFold with shuffling to prevent biased results from ordered data
         search = RandomizedSearchCV(
             estimator=self.pipeline,
             param_distributions=param_distributions,
@@ -212,11 +226,15 @@ class ValuationEngine:
         """Evaluates the model and returns key metrics."""
         preds = self.pipeline.predict(X)
         
-        # Handle multi-output metrics
+        # Ensure non-negative predictions for metrics like MAPE/RMSLE
+        preds = np.clip(preds, a_min=0, a_max=None)
+        
         r2 = r2_score(y, preds)
         mae = mean_absolute_error(y, preds)
+        mape = mean_absolute_percentage_error(y, preds)
+        rmsle = root_mean_squared_log_error(y, preds)
         
-        metrics = {"r2": r2, "mae": mae}
+        metrics = {"r2": r2, "mae": mae, "mape": mape, "rmsle": rmsle}
         self.logger.info(f"Evaluation Metrics: {metrics}")
         return metrics
 
