@@ -12,8 +12,12 @@ class FinancialDataLoader:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
-        self.raw_data_dir = "../data/raw"
-        self.proc_data_dir = "../data/processed"
+        # Define project root relative to this file (src/data_loader.py)
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Paths are now absolute to project root
+        self.raw_data_dir = os.path.join(self.project_root, "data", "raw")
+        self.proc_data_dir = os.path.join(self.project_root, "data", "processed")
 
         # Make sure directories exist
         os.makedirs(self.raw_data_dir, exist_ok=True)
@@ -55,32 +59,37 @@ class FinancialDataLoader:
             stock = yf.Ticker(ticker)
             info = stock.info
 
+            # Safely calculate EBITDA if missing
+            ebitda = info.get("ebitda")
+            if ebitda is None:
+                ebitda = info.get("operatingIncome", 0)
+
             return {
                 "ticker": ticker,
+                "enterprise_value": info.get("enterpriseValue"), # The universal target (y)
                 
-                # Quantitative block for ML
+                # PUBLIC ENGINE FEATURES
                 "forwardPE": info.get("forwardPE"),
                 "ev_to_ebitda": info.get("enterpriseToEbitda"),
-                "ebitda_margin": info.get("ebitdaMargins"),
-                "debt_to_equity": info.get("debtToEquity"),
-                
-                # Qualitative block for ML
-                "sector": info.get("sector", "Unknown"),
-                "industry": info.get("industry", "Unknown"),
-                "business_summary": info.get("longBusinessSummary", ""),
-                
-                # Data for valuation
-                "ebitda": info.get("ebitda"),
+                "ebitda": ebitda,
                 "total_cash": info.get("totalCash"),
                 "total_debt": info.get("totalDebt"),
-                "shares_outstanding": info.get("sharesOutstanding")
+                
+                # PRIVATE ENGINE FEATURES (Proxies)
+                "employee_count": info.get("fullTimeEmployees"),
+                "estimated_revenue": info.get("totalRevenue"),
+                
+                # UNIVERSAL NLP FEATURES 
+                "sector": info.get("sector", "Unknown"),
+                "industry": info.get("industry", "Unknown"),
+                "business_summary": info.get("longBusinessSummary", "")
             }
         except Exception as e:
                 self.logger.warning(f"Failed to fetch data for {ticker}: {e}")
                 return None
 
     # Builds raw company metrics table
-    def build_csv_comps_table(self,raw_data_path: str, output_csv: str, chunk_size: int = 50, limit: int = None) -> bool:
+    def build_raw_master_table(self,raw_data_path: str, output_csv: str, chunk_size: int = 50, limit: int = None) -> bool:
 
         self.logger.info("Starting large data pull...")
         df_raw = pd.read_json(raw_data_path, orient='index')
@@ -131,7 +140,7 @@ class FinancialDataLoader:
                 # Dead letter queue (DQL)
                 if missed_tickers:
                     dlq_df = pd.DataFrame({"failed_tickers": missed_tickers})
-                    dlq_csv = "../data/processed/missed_tickers.csv"
+                    dlq_csv = os.path.join(self.proc_data_dir, "missed_tickers.csv")
                     dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
                     self.logger.info(f"Chunk {i//chunk_size}: {len(missed_tickers)} tickers missing. Saved to DLQ.")
 
@@ -142,42 +151,65 @@ class FinancialDataLoader:
             else:
                 self.logger.error(f"CRITICAL: Chunk {i//chunk_size} failed after {max_attempts} attempts. Skipping chunk to keep pipeline alive.")
                 dlq_df = pd.DataFrame({"failed_tickers": chunk})
-                dlq_csv = "../data/processed/missed_tickers.csv"
+                dlq_csv = os.path.join(self.proc_data_dir, "missed_tickers.csv")
                 dlq_df.to_csv(dlq_csv, mode='a', header=not os.path.exists(dlq_csv), index=False)
 
         return True
 
 
-    def clean_csv_comps_table(self, raw_data_path: str, output_parquet: str) -> bool:
+    def build_public_training_table(self, master_csv: str, output_parquet: str) -> bool:
+        """Filters the master data strictly for the Public Comparables Engine"""
 
-        self.logger.info("Starting data cleaning process...")
-        df = pd.read_csv(raw_data_path)
+        self.logger.info("Building Public Engine Training Table...")
+        df = pd.read_csv(master_csv)
 
-        # Irrecoverable data
-        df = df.dropna(subset=["ebitda", "sector", "industry", "shares_outstanding", "business_summary"])
-        df["total_debt"] = df["total_debt"].fillna(0)
-        df["total_cash"] = df["total_cash"].fillna(0)
-        self.logger.info("Removed entries with irrecoverable data")
+        # Select only columns relevant to public valuation
+        public_cols = [
+            "ticker", "enterprise_value", "forwardPE", "ev_to_ebitda", 
+            "ebitda", "total_cash", "total_debt", "sector", "business_summary"
+        ]
+        df_public = df[public_cols].copy()
 
-        # Adding more robust debt_to_ebitda metric
-        df["debt_to_ebitda"] = df["total_debt"] / df["ebitda"]
-        df = df.drop(columns=["debt_to_equity"])
-        self.logger.info("Generated debt_to_ebita column")
+        # Strict dropping for public metrics
+        # If a public company doesn't report EBITDA or Debt, we drop it from training.
+        df_public = df_public.dropna(subset=["enterprise_value", "ebitda", "total_debt", "business_summary"])
+        df_public = df_public[df_public['business_summary'].str.len() > 50]
+        
+        # Enforce numeric types
+        for col in ["enterprise_value", "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", "total_debt"]:
+            df_public[col] = pd.to_numeric(df_public[col], errors='coerce')
 
-        # Conditional fill to account for ev_to_ebita ratios that are because of negative EBDITA vs just missing
-        df.loc[df["ebitda"] <= 0, "ev_to_ebitda"] = df.loc[df["ebitda"] <= 0, "ev_to_ebitda"].fillna(0)
-        df["ev_to_ebitda"] = df.groupby("sector")["ev_to_ebitda"].transform(lambda x: x.fillna(x.median()))
-        df["forwardPE"] = df.groupby("sector")["forwardPE"].transform(lambda x: x.fillna(x.median()))
-        df = df.dropna(subset=["ev_to_ebitda", "forwardPE"])
-        self.logger.info("Generated debt_to_ebita column")
-
-        df = df.reset_index(drop=True)
-
-        df.to_parquet(output_parquet, index=False)
-        self.logger.info("Stored cleaned dataframe to parquet")
-
+        df_public = df_public.reset_index(drop=True)
+        df_public.to_parquet(output_parquet, index=False)
+        self.logger.info(f"Public Training Table complete: {len(df_public)} rows.")
         return True
 
+
+    def build_private_training_table(self, master_csv: str, output_parquet: str) -> bool:
+        """Filters the master data strictly for the Private Startup Engine."""
+        self.logger.info("Building Private Engine Training Table...")
+        df = pd.read_csv(master_csv)
+
+        # Select only the proxy columns and the universal target
+        private_cols = [
+            "ticker", "enterprise_value", "employee_count", "estimated_revenue", 
+            "sector", "business_summary"
+        ]
+        df_private = df[private_cols].copy()
+
+        # Strict dropping for private metrics
+        # If we don't have the proxy data, the model can't learn the relationship.
+        df_private = df_private.dropna(subset=["enterprise_value", "employee_count", "estimated_revenue", "business_summary"])
+        df_private = df_private[df_private['business_summary'].str.len() > 50]
+
+        # Enforce numeric types
+        for col in ["enterprise_value", "employee_count", "estimated_revenue"]:
+            df_private[col] = pd.to_numeric(df_private[col], errors='coerce')
+
+        df_private = df_private.reset_index(drop=True)
+        df_private.to_parquet(output_parquet, index=False)
+        self.logger.info(f"Private Training Table complete: {len(df_private)} rows.")
+        return True
 
 
 if __name__ == "__main__":
@@ -190,5 +222,18 @@ if __name__ == "__main__":
     )
 
     loader = FinancialDataLoader()
+    root = loader.project_root
 
-    loader.build_csv_comps_table("../data/raw/company_tickers.json", "../data/raw/company_metrics.csv", 100)
+    # SEC Download logic
+    sec_url = "https://www.sec.gov/files/company_tickers.json"
+    headers = {"User-Agent": "Ryan Fue rfue29@gmail.com"}
+    loader.download_file(sec_url, "company_tickers.json", headers=headers)
+
+    master_file = os.path.join(root, "data", "raw", "master_metrics.csv")
+    raw_tickers_path = os.path.join(root, "data", "raw", "company_tickers.json")
+
+    # Full data pull (no limit)
+    loader.build_raw_master_table(raw_tickers_path, master_file, limit=None)
+
+    loader.build_public_training_table(master_file, os.path.join(root, "data", "processed", "PUBLIC_training.parquet"))
+    loader.build_private_training_table(master_file, os.path.join(root, "data", "processed", "PRIVATE_training.parquet"))
