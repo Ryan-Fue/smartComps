@@ -95,3 +95,27 @@ def test_tqdm_progress_bar_in_train(mock_ml_data):
         mock_tqdm.assert_called_once_with(total=1, desc="Training Model")
         # Verify update was called
         mock_pbar.update.assert_called_once_with(1)
+
+def test_dynamic_target_rebuild(mock_ml_data):
+    """Verifies that the engine correctly handles changing target columns dynamically."""
+    engine = ValuationEngine(mode="public")
+    
+    # Initial state
+    initial_target = engine.target_cols
+    
+    # Change target to one of the features
+    new_target = "forwardPE"
+    X, y = engine.prepare_data(mock_ml_data, target_col=new_target)
+    
+    assert engine.target_cols == [new_target]
+    assert new_target not in X.columns
+    
+    # Verify the pipeline's ColumnTransformer was updated
+    preprocessor = engine.pipeline.named_steps['preprocess']
+    fin_prep_cols = preprocessor.transformers[0][2]
+    assert new_target not in fin_prep_cols
+    
+    # Should be able to train and predict without "column not found" error
+    engine.train(X, y)
+    preds = engine.predict(X)
+    assert preds.shape == (20, 1)

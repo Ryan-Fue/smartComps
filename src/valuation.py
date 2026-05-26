@@ -49,28 +49,34 @@ class ValuationEngine:
 
         # 1. Determine Financial Columns
         if fin_cols is not None:
-            self.fin_cols = fin_cols
+            self.base_fin_cols = fin_cols
         elif mode == "public":
-            self.fin_cols = self.PUBLIC_FIN_COLS
+            self.base_fin_cols = self.PUBLIC_FIN_COLS
         elif mode == "private":
-            self.fin_cols = self.PRIVATE_FIN_COLS
+            self.base_fin_cols = self.PRIVATE_FIN_COLS
         else: # hybrid
-            self.fin_cols = self.PUBLIC_FIN_COLS + self.PRIVATE_FIN_COLS
+            self.base_fin_cols = self.PUBLIC_FIN_COLS + self.PRIVATE_FIN_COLS
 
         # 2. Determine NLP Columns (default to 384 if not specified)
         if nlp_cols is not None:
-            self.nlp_cols = nlp_cols
+            self.base_nlp_cols = nlp_cols
         else:
-            self.nlp_cols = [f"nlp_{i}" for i in range(384)]
+            self.base_nlp_cols = [f"nlp_{i}" for i in range(384)]
 
         # 3. Determine Target Columns
         self.target_cols = target_cols if target_cols else ["enterprise_value"]
         
-        # The master pipeline object
-        self.pipeline = self._build_pipeline(n_estimators, random_state)
+        # 4. Initialize features and pipeline
+        self._update_features_and_pipeline()
+
+    def _update_features_and_pipeline(self) -> None:
+        """Filters base features against target_cols and rebuilds the pipeline."""
+        self.fin_cols = [c for c in self.base_fin_cols if c not in self.target_cols]
+        self.nlp_cols = [c for c in self.base_nlp_cols if c not in self.target_cols]
         
-        # Alias for test compatibility
-        self.model = self.pipeline
+        # Rebuild the pipeline with updated feature sets
+        self.pipeline = self._build_pipeline(self.n_estimators, self.random_state)
+        self.model = self.pipeline  # Maintain alias
 
     def _build_pipeline(self, n_estimators: int, random_state: int = 42) -> Pipeline:
         """Constructs the Scikit-Learn pipeline."""
@@ -104,27 +110,37 @@ class ValuationEngine:
     def prepare_data(self, df: pd.DataFrame, target_col: str = None) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Filters and splits the dataframe into features (X) and target (y).
-        If target_col is provided, it overrides self.target_cols for this call.
+        If target_col is provided, it updates the internal state if different from current target.
         """
         self.logger.info("Preparing data for modeling...")
         
-        targets = [target_col] if target_col else self.target_cols
+        requested_targets = [target_col] if target_col else self.target_cols
         
-        # Ensure all required columns exist and exclude targets from features
-        available_fin = [c for c in self.fin_cols if c in df.columns and c not in targets]
-        available_nlp = [c for c in self.nlp_cols if c in df.columns and c not in targets]
+        # Dynamic rebuild if target changes
+        if requested_targets != self.target_cols:
+            self.logger.info(f"Target changed to {requested_targets}. Rebuilding pipeline...")
+            self.target_cols = requested_targets
+            self._update_features_and_pipeline()
+            
+        # Use updated feature lists
+        available_fin = [c for c in self.fin_cols if c in df.columns]
+        available_nlp = [c for c in self.nlp_cols if c in df.columns]
         
         X = df[available_fin + available_nlp]
-        y = df[targets]
-        
-        # If target is missing from y, we might need to handle it or drop rows
-        # For simplicity, we assume the dataframe provided is cleaned.
+        y = df[self.target_cols]
         
         return X, y
 
     def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame) -> None:
-        """Trains the valuation model."""
+        """Trains the valuation model with a final check on feature alignment."""
         self.logger.info(f"Training model on {len(X_train)} samples...")
+        
+        # Final safety check: Ensure all columns expected by ColumnTransformer are in X_train
+        expected_cols = self.fin_cols + self.nlp_cols
+        missing_cols = [c for c in expected_cols if c not in X_train.columns]
+        if missing_cols:
+            raise ValueError(f"X_train is missing columns expected by pipeline: {missing_cols}")
+
         with tqdm(total=1, desc="Training Model") as pbar:
             self.pipeline.fit(X_train, y_train)
             pbar.update(1)
