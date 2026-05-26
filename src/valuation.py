@@ -29,7 +29,7 @@ class ValuationEngine:
                  nlp_cols: list = None, 
                  target_cols: list = None, 
                  n_estimators: int = 150, 
-                 random_state: int = 42):
+                 random_state: int = 42) -> None:
         """
         Initializes the ValuationEngine.
         
@@ -71,7 +71,7 @@ class ValuationEngine:
         # Alias for test compatibility
         self.model = self.pipeline
 
-    def _build_pipeline(self, n_estimators: int, random_state: int = 42):
+    def _build_pipeline(self, n_estimators: int, random_state: int = 42) -> Pipeline:
         """Constructs the Scikit-Learn pipeline."""
         
         # Preprocessor for financial and NLP data
@@ -100,7 +100,7 @@ class ValuationEngine:
             ('model', model)
         ])
 
-    def prepare_data(self, df: pd.DataFrame, target_col: str = None):
+    def prepare_data(self, df: pd.DataFrame, target_col: str = None) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Filters and splits the dataframe into features (X) and target (y).
         If target_col is provided, it overrides self.target_cols for this call.
@@ -121,7 +121,7 @@ class ValuationEngine:
         
         return X, y
 
-    def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame):
+    def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame) -> None:
         """Trains the valuation model."""
         self.logger.info(f"Training model on {len(X_train)} samples...")
         self.pipeline.fit(X_train, y_train)
@@ -133,7 +133,7 @@ class ValuationEngine:
         preds = self.pipeline.predict(X_new)
         return pd.DataFrame(preds, columns=self.target_cols, index=X_new.index)
 
-    def evaluate(self, X: pd.DataFrame, y: pd.DataFrame):
+    def evaluate(self, X: pd.DataFrame, y: pd.DataFrame) -> dict[str, float]:
         """Evaluates the model and returns key metrics."""
         preds = self.pipeline.predict(X)
         
@@ -145,12 +145,12 @@ class ValuationEngine:
         self.logger.info(f"Evaluation Metrics: {metrics}")
         return metrics
 
-    def save_model(self, file_path: str):
+    def save_model(self, file_path: str) -> None:
         """Persists the trained pipeline to disk."""
         self.logger.info(f"Saving model to {file_path}...")
         joblib.dump(self.pipeline, file_path)
 
-    def load_model(self, file_path: str):
+    def load_model(self, file_path: str) -> None:
         """Loads a pre-trained pipeline from disk."""
         self.logger.info(f"Loading model from {file_path}...")
         self.pipeline = joblib.load(file_path)
