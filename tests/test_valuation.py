@@ -119,3 +119,25 @@ def test_dynamic_target_rebuild(mock_ml_data):
     engine.train(X, y)
     preds = engine.predict(X)
     assert preds.shape == (20, 1)
+
+def test_infinite_value_handling(mock_ml_data):
+    """Verifies that infinite values in the input data are handled correctly."""
+    df = mock_ml_data.copy()
+    # Introduce infinite values
+    df.loc[0, "forwardPE"] = np.inf
+    df.loc[1, "ev_to_ebitda"] = -np.inf
+    
+    engine = ValuationEngine(mode="public")
+    X, y = engine.prepare_data(df, target_col="enterprise_value")
+    
+    # Check that inf values are gone in X
+    assert not np.isinf(X).values.any()
+    # Check that they were replaced by NaN (since original data had them)
+    assert np.isnan(X.loc[0, "forwardPE"])
+    assert np.isnan(X.loc[1, "ev_to_ebitda"])
+    
+    # Ensure training still works (KNNImputer handles NaNs)
+    try:
+        engine.train(X, y)
+    except ValueError as e:
+        pytest.fail(f"Training failed with infinite values handled as NaNs: {e}")

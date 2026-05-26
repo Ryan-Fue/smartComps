@@ -126,8 +126,17 @@ class ValuationEngine:
         available_fin = [c for c in self.fin_cols if c in df.columns]
         available_nlp = [c for c in self.nlp_cols if c in df.columns]
         
-        X = df[available_fin + available_nlp]
-        y = df[self.target_cols]
+        X = df[available_fin + available_nlp].copy()
+        y = df[self.target_cols].copy()
+
+        # 1. Handle infinite values by converting them to NaN for the imputer
+        X.replace([np.inf, -np.inf], np.nan, inplace=True)
+        y.replace([np.inf, -np.inf], np.nan, inplace=True)
+        
+        # 2. Cap extremely large values to prevent numerical overflow in downstream models
+        # 1e15 (quadrillion) is a safe upper bound for financial metrics
+        X = X.clip(lower=-1e15, upper=1e15)
+        y = y.clip(lower=-1e15, upper=1e15)
         
         return X, y
 
