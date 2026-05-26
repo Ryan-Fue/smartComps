@@ -7,7 +7,7 @@ from tqdm import tqdm
 from scipy.stats import loguniform, randint
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
-from sklearn.preprocessing import RobustScaler, TargetEncoder
+from sklearn.preprocessing import RobustScaler, TargetEncoder, FunctionTransformer
 from sklearn.impute import KNNImputer
 from sklearn.decomposition import PCA
 from sklearn.multioutput import MultiOutputRegressor
@@ -17,6 +17,10 @@ from sklearn.model_selection import RandomizedSearchCV, KFold
 def safe_expm1(x):
     """Inverse log transform that guarantees results >= 0 for mathematical stability."""
     return np.clip(np.expm1(x), 0, None)
+
+def log_transform(x):
+    """Applies log1p transformation, clipping to handle potential negatives gracefully."""
+    return np.log1p(np.clip(x, 0, None))
 
 class ValuationEngine:
     """
@@ -85,19 +89,23 @@ class ValuationEngine:
         # Preprocessor for financial, categorical, and NLP data
         preprocessor = ColumnTransformer([
             ("fin_prep", Pipeline([
+                ("log", FunctionTransformer(log_transform, validate=True)),
                 ("scaler", RobustScaler()),
                 ("imputer", KNNImputer(n_neighbors=5, weights='distance'))
             ]), self.fin_cols),
-            ("cat_prep", TargetEncoder(random_state=random_state), self.cat_cols),
+            # Explicitly set target_type='continuous' to avoid incorrect stratification errors
+            ("cat_prep", TargetEncoder(target_type='continuous', random_state=random_state), self.cat_cols),
             ("nlp_prep", PCA(n_components=30, random_state=random_state), self.nlp_cols)
         ])
         
         # Base XGBoost model wrapped for multi-output
+        # increased min_child_weight and conservative max_depth to handle mega-caps better
         base_model = MultiOutputRegressor(
             xgb.XGBRegressor(
                 n_estimators=n_estimators,
                 learning_rate=0.1,
-                max_depth=5,
+                max_depth=4,
+                min_child_weight=10,
                 random_state=random_state,
                 n_jobs=-1
             )
@@ -181,6 +189,8 @@ class ValuationEngine:
                 "model__regressor__estimator__subsample": loguniform(0.5, 1.0),
                 "model__regressor__estimator__colsample_bytree": loguniform(0.5, 1.0)
             }
+
+            
 
         search = RandomizedSearchCV(
             estimator=self.pipeline,
