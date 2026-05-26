@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import xgboost as xgb
 import joblib
+from tqdm import tqdm
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import RobustScaler
@@ -124,7 +125,9 @@ class ValuationEngine:
     def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame) -> None:
         """Trains the valuation model."""
         self.logger.info(f"Training model on {len(X_train)} samples...")
-        self.pipeline.fit(X_train, y_train)
+        with tqdm(total=1, desc="Training Model") as pbar:
+            self.pipeline.fit(X_train, y_train)
+            pbar.update(1)
         self.logger.info("Training complete.")
 
     def predict(self, X_new: pd.DataFrame) -> pd.DataFrame:

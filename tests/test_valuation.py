@@ -2,6 +2,7 @@ import pytest
 import pandas as pd
 import numpy as np
 import os
+from unittest.mock import patch, MagicMock
 from src.valuation import ValuationEngine
 
 @pytest.fixture
@@ -77,3 +78,20 @@ def test_private_mode_initialization():
     assert "employee_count" in engine.fin_cols
     assert "estimated_revenue" in engine.fin_cols
     assert "forwardPE" not in engine.fin_cols
+
+def test_tqdm_progress_bar_in_train(mock_ml_data):
+    """Verifies that tqdm is called during the training process."""
+    engine = ValuationEngine(mode="public")
+    X, y = engine.prepare_data(mock_ml_data, target_col="enterprise_value")
+    
+    with patch("src.valuation.tqdm") as mock_tqdm:
+        # Configure mock_tqdm to act like a context manager
+        mock_pbar = MagicMock()
+        mock_tqdm.return_value.__enter__.return_value = mock_pbar
+        
+        engine.train(X, y)
+        
+        # Verify tqdm was initialized
+        mock_tqdm.assert_called_once_with(total=1, desc="Training Model")
+        # Verify update was called
+        mock_pbar.update.assert_called_once_with(1)
