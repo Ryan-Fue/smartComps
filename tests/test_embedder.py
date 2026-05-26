@@ -23,6 +23,17 @@ def sample_df():
         "business_summary": ["Technology company focused on AI", "Retailer with many stores", "Healthcare provider"]
     })
 
+@pytest.fixture
+def private_sample_df():
+    return pd.DataFrame({
+        "ticker": ["P1", "P2"],
+        "enterprise_value": [1e7, 2e7],
+        "employee_count": [50, 150],
+        "estimated_revenue": [5e6, 1.5e7],
+        "sector": ["Technology", "Healthcare"],
+        "business_summary": ["A stealth mode AI startup", "Digital health platform"]
+    })
+
 
 
 def test_embed_summaries(processor, sample_df):
@@ -47,9 +58,9 @@ def test_drop_extra_columns(processor, sample_df):
     for col in extra_columns:
         assert col not in df.columns
 
-def test_process_pipeline(processor, sample_df, tmp_path):
-    input_path = tmp_path / "input.parquet"
-    output_path = tmp_path / "output.parquet"
+def test_process_pipeline_public(processor, sample_df, tmp_path):
+    input_path = tmp_path / "PUBLIC_training.parquet"
+    output_path = tmp_path / "PUBLIC_embedded.parquet"
     
     sample_df.to_parquet(input_path)
     
@@ -61,3 +72,20 @@ def test_process_pipeline(processor, sample_df, tmp_path):
     nlp_cols = ["nlp_" + str(i) for i in range(384)]
     assert set(nlp_cols).issubset(df_processed.columns)
     assert "forwardPE" in df_processed.columns
+    assert "ticker" not in df_processed.columns
+
+def test_process_pipeline_private(processor, private_sample_df, tmp_path):
+    input_path = tmp_path / "PRIVATE_training.parquet"
+    output_path = tmp_path / "PRIVATE_embedded.parquet"
+    
+    private_sample_df.to_parquet(input_path)
+    
+    result = processor.process_pipeline(str(input_path), str(output_path))
+    
+    assert result is True
+    assert os.path.exists(output_path)
+    df_processed = pd.read_parquet(output_path)
+    nlp_cols = ["nlp_" + str(i) for i in range(384)]
+    assert set(nlp_cols).issubset(df_processed.columns)
+    assert "estimated_revenue" in df_processed.columns
+    assert "ticker" not in df_processed.columns
