@@ -166,7 +166,7 @@ class FinancialDataLoader:
         # Select only columns relevant to public valuation
         public_cols = [
             "ticker", "enterprise_value", "forwardPE", "ev_to_ebitda", 
-            "ebitda", "total_cash", "total_debt", "sector", "business_summary"
+            "ebitda", "total_cash", "total_debt", "estimated_revenue", "employee_count", "sector", "business_summary"
         ]
         df_public = df[public_cols].copy()
 
@@ -176,7 +176,7 @@ class FinancialDataLoader:
         df_public = df_public[df_public['business_summary'].str.len() > 50]
         
         # Enforce numeric types
-        for col in ["enterprise_value", "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", "total_debt"]:
+        for col in ["enterprise_value", "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", "total_debt", "estimated_revenue", "employee_count"]:
             df_public[col] = pd.to_numeric(df_public[col], errors='coerce')
 
         df_public = df_public.reset_index(drop=True)

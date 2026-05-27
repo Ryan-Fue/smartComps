@@ -7,7 +7,7 @@ from tqdm import tqdm
 from scipy.stats import loguniform, randint
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
-from sklearn.preprocessing import RobustScaler, TargetEncoder, FunctionTransformer
+from sklearn.preprocessing import StandardScaler, TargetEncoder, FunctionTransformer
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.decomposition import PCA
 from sklearn.multioutput import MultiOutputRegressor
@@ -18,9 +18,9 @@ def safe_expm1(x):
     """Inverse log transform that guarantees results >= 0 for mathematical stability."""
     return np.clip(np.expm1(x), 0, None)
 
-def log_transform(x):
-    """Applies log1p transformation, clipping to handle potential negatives gracefully."""
-    return np.log1p(np.clip(x, 0, None))
+def sym_log_transform(x):
+    """Symmetric log transform to handle negative values while compressing scale."""
+    return np.sign(x) * np.log1p(np.abs(x))
 
 class ValuationEngine:
     """
@@ -84,14 +84,14 @@ class ValuationEngine:
         self.model = self.pipeline
 
     def _build_pipeline(self, n_estimators: int, random_state: int = 42) -> Pipeline:
-        """Constructs the Scikit-Learn pipeline with log-transformed targets."""
+        """Constructs the Scikit-Learn pipeline with symmetric log-transformed features."""
         
         # Preprocessor for financial, categorical, and NLP data
         preprocessor = ColumnTransformer([
             ("fin_prep", Pipeline([
-                ("log", FunctionTransformer(log_transform, validate=False)),
-                ("scaler", RobustScaler()),
-                ("imputer", KNNImputer(n_neighbors=5, weights='distance'))
+                ("imputer", KNNImputer(n_neighbors=5, weights='distance')),
+                ("sym_log", FunctionTransformer(sym_log_transform)),
+                ("scaler", StandardScaler())
             ]), self.fin_cols),
             ("cat_prep", Pipeline([
                 ("imputer", SimpleImputer(strategy='constant', fill_value='Unknown')),
@@ -103,13 +103,16 @@ class ValuationEngine:
             ]), self.nlp_cols)
         ])
         
-        # Base XGBoost model wrapped for multi-output
+        # Base XGBoost model
+        # We slightly increase depth back to 5 but keep min_child_weight for stability
         base_model = MultiOutputRegressor(
             xgb.XGBRegressor(
                 n_estimators=n_estimators,
-                learning_rate=0.1,
-                max_depth=4,
-                min_child_weight=10,
+                learning_rate=0.05,
+                max_depth=5,
+                min_child_weight=5,
+                subsample=0.8,
+                colsample_bytree=0.8,
                 random_state=random_state,
                 n_jobs=-1
             )
@@ -156,11 +159,12 @@ class ValuationEngine:
             X = X[~nan_targets]
             y = y[~nan_targets]
         
-        # Clip numerical features only
+        # Clip numerical features to realistic financial bounds
         num_cols = available_fin + available_nlp
-        X[num_cols] = X[num_cols].clip(lower=-1e15, upper=1e15)
+        X[num_cols] = X[num_cols].clip(lower=-1e13, upper=1e13)
         
-        y = y.clip(lower=0, upper=1e15) # Log requires target >= 0
+        # Targets must be positive for log1p. We also cap at 10 Trillion to prevent outliers.
+        y = y.clip(lower=0, upper=1e13) 
         
         return X, y
 
@@ -184,7 +188,7 @@ class ValuationEngine:
                              cv: int = 5, 
                              scoring: str = "neg_mean_squared_log_error",
                              n_jobs: int = -1) -> dict:
-        """Conducts hyperparameter tuning using randomized search with robust distributions."""
+        """Conducts hyperparameter tuning using randomized search."""
         self.logger.info(f"Tuning hyperparameters (n_iter={n_iter}, cv={cv}, n_jobs={n_jobs})...")
 
         if param_distributions is None:
@@ -194,8 +198,8 @@ class ValuationEngine:
                 "model__regressor__estimator__max_depth": randint(3, 10),
                 "model__regressor__estimator__learning_rate": loguniform(1e-3, 0.3),
                 "model__regressor__estimator__n_estimators": randint(100, 1000),
-                "model__regressor__estimator__subsample": loguniform(0.5, 1.0),
-                "model__regressor__estimator__colsample_bytree": loguniform(0.5, 1.0)
+                "model__regressor__estimator__subsample": loguniform(0.6, 1.0),
+                "model__regressor__estimator__colsample_bytree": loguniform(0.6, 1.0)
             }
 
         search = RandomizedSearchCV(
@@ -218,22 +222,23 @@ class ValuationEngine:
         return search.best_params_
 
     def predict(self, X_new: pd.DataFrame) -> pd.DataFrame:
-        """Generates predictions and ensures they are formatted as a DataFrame."""
+        """Generates predictions and clips them to realistic valuation bounds."""
         preds = self.pipeline.predict(X_new)
         if preds.ndim == 1:
             preds = preds.reshape(-1, 1)
+        
+        # Clip final predictions to max realistic global valuation (10 Trillion)
+        preds = np.clip(preds, 0, 1e13)
         return pd.DataFrame(preds, columns=self.target_cols, index=X_new.index)
 
     def evaluate(self, X: pd.DataFrame, y: pd.DataFrame) -> dict[str, float]:
         """Evaluates the model and returns robust relative and absolute metrics."""
         preds_df = self.predict(X)
         preds = preds_df.values
-        
-        preds = np.clip(preds, 0, None)
         y_val = y.values
         
+        # Calculate relative errors
         abs_pct_error = np.abs((y_val - preds) / (y_val + 1))
-        
         y_val_clipped = np.clip(y_val, 0, None)
         
         metrics = {
