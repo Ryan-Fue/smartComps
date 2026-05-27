@@ -89,9 +89,9 @@ class ValuationEngine:
         # Preprocessor for financial, categorical, and NLP data
         preprocessor = ColumnTransformer([
             ("fin_prep", Pipeline([
-                ("imputer", KNNImputer(n_neighbors=5, weights='distance')),
                 ("sym_log", FunctionTransformer(sym_log_transform)),
-                ("scaler", StandardScaler())
+                ("scaler", StandardScaler()),
+                ("imputer", KNNImputer(n_neighbors=5, weights='distance'))
             ]), self.fin_cols),
             ("cat_prep", Pipeline([
                 ("imputer", SimpleImputer(strategy='constant', fill_value='Unknown')),
