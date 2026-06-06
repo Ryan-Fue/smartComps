@@ -14,6 +14,11 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_log_error
 from sklearn.model_selection import RandomizedSearchCV, KFold
 
+
+"""
+These helper Functions are used by the class to preform safe scaling.
+"""
+
 def safe_expm1(x):
     """Inverse log transform that guarantees results >= 0 for mathematical stability."""
     return np.clip(np.expm1(x), 0, None)
