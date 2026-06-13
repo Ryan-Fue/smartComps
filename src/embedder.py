@@ -45,11 +45,12 @@ class FeatureProcessor:
 
     def drop_extra_columns(self, df: pd.DataFrame, extra_col: list = None) -> pd.DataFrame:
         """
-        Drops non-numeric and metadata columns to prepare data for ML modeling.
+        Drops non-numeric metadata columns (ticker, industry, business_summary) 
+        while preserving ML features like 'sector'.
         """
         if extra_col is None:
-            # Default metadata columns to drop
-            extra_col = ["ticker", "sector", "industry", "business_summary", "embeddings"]
+            # Default metadata columns to drop (sector is preserved for categorical encoding)
+            extra_col = ["ticker", "industry", "business_summary"]
         
         # Filter for columns that actually exist in the dataframe
         existing_cols_to_drop = [col for col in extra_col if col in df.columns]
@@ -108,28 +109,15 @@ if __name__ == "__main__":
     processor = FeatureProcessor()
     root = processor.project_root
     
-    # 1. PUBLIC PIPELINE: Pure financial valuation
-    # Drops sector as it has minimal impact on hard financial multiples
-    public_in = os.path.join(root, "data", "processed", "PUBLIC_training.parquet")
-    public_out = os.path.join(root, "data", "processed", "PUBLIC_embedded.parquet")
-    public_drop = ["ticker", "business_summary"]
+    # PROCESS PIPELINE
+    universal_in = os.path.join(root, "data", "processed", "UNIVERSAL_training.parquet")
+    universal_out = os.path.join(root, "data", "processed", "UNIVERSAL_embedded.parquet")
     
-    if os.path.exists(public_in):
-        success = processor.process_pipeline(public_in, public_out, drop_cols=public_drop)
+    if os.path.exists(universal_in):
+        success = processor.process_pipeline(universal_in, universal_out)
         if success:
-            logger.info(f"Public pipeline complete -> {public_out}")
+            logger.info(f"Universal pipeline complete -> {universal_out}")
     else:
-        logger.warning(f"Public input {public_in} not found. Run data_loader.py first.")
+        logger.warning(f"Universal input {universal_in} not found. Run data_loader.py first.")
 
-    # 2. PRIVATE PIPELINE: Proxy valuation
-    # Drops sector as private input data is often noisy or missing these headers
-    private_in = os.path.join(root, "data", "processed", "PRIVATE_training.parquet")
-    private_out = os.path.join(root, "data", "processed", "PRIVATE_embedded.parquet")
-    private_drop = ["ticker", "business_summary"]
-    
-    if os.path.exists(private_in):
-        success = processor.process_pipeline(private_in, private_out, drop_cols=private_drop)
-        if success:
-            logger.info(f"Private pipeline complete -> {private_out}")
-    else:
-        logger.warning(f"Private input {private_in} not found. Run data_loader.py first.")
+   
