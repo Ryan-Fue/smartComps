@@ -19,7 +19,9 @@ dependencies = [
     "matplotlib (>=3.10.9,<4.0.0)",
     "seaborn (>=0.13.2,<0.14.0)",
     "xgboost (>=3.2.0,<4.0.0)",
-    "pytest (>=9.0.3,<10.0.0)"
+    "pytest (>=9.0.3,<10.0.0)",
+    "fastapi (>=0.136.3,<0.137.0)",
+    "uvicorn (>=0.49.0,<0.50.0)"
 ]
 
 [tool.poetry]
