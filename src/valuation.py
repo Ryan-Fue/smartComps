@@ -82,7 +82,7 @@ class ValuationEngine:
         if self.nlp_cols:
             transformers.append(("nlp_prep", Pipeline([
                 ("imputer", SimpleImputer(strategy='mean')),
-                ("pca", PCA(n_components=min(30, len(self.nlp_cols)), random_state=self.random_state))
+                ("pca", PCA(n_components=min(10, len(self.nlp_cols)), random_state=self.random_state))
             ]), self.nlp_cols))
 
         if not transformers:
@@ -225,7 +225,11 @@ class ValuationEngine:
         best_xgb_params = {k: v for k, v in study.best_params.items() if k != 'n_estimators'}
         self.pipeline.named_steps['model'].regressor.estimator.set_params(**best_xgb_params)
         
-        self.logger.info("Pipeline updated with best parameters.")
+        # Final retrain on full data
+        self.logger.info("Retraining model with best hyperparameters...")
+        self.train(X_train, y_train)
+        
+        self.logger.info("Pipeline updated and fully trained with best parameters.")
         return study.best_params
 
     def predict(self, X_new: pd.DataFrame) -> pd.DataFrame:
