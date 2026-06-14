@@ -62,6 +62,24 @@ def test_fetch_single_comp_metrics(mock_ticker, data_loader):
     assert metrics["enterprise_value"] == 5000000
     assert len(metrics["business_summary"]) > 50
 
+@patch("src.data_loader.yf.Ticker")
+def test_fetch_single_comp_metrics_ebitda_fallback(mock_ticker, data_loader):
+    # Setup: ebitda is missing, operatingIncome is present
+    mock_info = {
+        "operatingIncome": 800000,
+        "enterpriseValue": 5000000,
+        "sector": "Technology",
+        "longBusinessSummary": "Test summary " * 10
+    }
+    mock_ticker.return_value.info = mock_info
+    
+    # Execute
+    metrics = data_loader._fetch_single_comp_metrics("AAPL")
+    
+    # Verify
+    assert metrics["ebitda"] == 800000
+    assert metrics["enterprise_value"] == 5000000
+
 def test_build_universal_training_table(data_loader, tmp_path):
     # Setup dummy master CSV
     master_csv = tmp_path / "master.csv"
@@ -69,9 +87,9 @@ def test_build_universal_training_table(data_loader, tmp_path):
     
     df = pd.DataFrame({
         "ticker": ["KEEP1", "MISSING_EV", "MISSING_EBITDA", "MISSING_REV", "SHORT_SUMMARY", "KEEP2"],
-        "enterprise_value": [100, None, 100, 100, 100, 200],
-        "ebitda": [10, 10, None, 10, 10, 20],
-        "estimated_revenue": [1000, 1000, 1000, None, 1000, 2000],
+        "enterprise_value": [500_000_000, None, 500_000_000, 500_000_000, 500_000_000, 1_000_000_000],
+        "ebitda": [50_000_000, 50_000_000, None, 50_000_000, 50_000_000, 100_000_000],
+        "estimated_revenue": [100_000_000, 100_000_000, 100_000_000, None, 100_000_000, 200_000_000],
         "total_debt": [5, 5, 5, 5, 5, 10],
         "total_cash": [2, 2, 2, 2, 2, 4],
         "forwardPE": [15, 15, 15, 15, 15, 30],
