@@ -62,64 +62,68 @@ def test_fetch_single_comp_metrics(mock_ticker, data_loader):
     assert metrics["enterprise_value"] == 5000000
     assert len(metrics["business_summary"]) > 50
 
-def test_build_public_training_table(data_loader, tmp_path):
-    # Setup dummy master CSV
-    master_csv = tmp_path / "master.csv"
-    output_parquet = tmp_path / "public.parquet"
-    
-    df = pd.DataFrame({
-        "ticker": ["AAPL", "MISSING", "SHORT"],
-        "enterprise_value": [100, None, 100],
-        "ebitda": [10, 10, 10],
-        "total_debt": [5, 5, 5],
-        "total_cash": [2, 2, 2],
-        "forwardPE": [15, 15, 15],
-        "ev_to_ebitda": [8, 8, 8],
-        "sector": ["Tech", "Tech", "Tech"],
-        "business_summary": ["A long business summary that should pass the length check" * 2, "Long enough summary", "Short summary"]
-    })
-    df.to_csv(master_csv, index=False)
+@patch("src.data_loader.yf.Ticker")
+def test_fetch_single_comp_metrics_ebitda_fallback(mock_ticker, data_loader):
+    # Setup: ebitda is missing, operatingIncome is present
+    mock_info = {
+        "operatingIncome": 800000,
+        "enterpriseValue": 5000000,
+        "sector": "Technology",
+        "longBusinessSummary": "Test summary " * 10
+    }
+    mock_ticker.return_value.info = mock_info
     
     # Execute
-    result = data_loader.build_public_training_table(str(master_csv), str(output_parquet))
+    metrics = data_loader._fetch_single_comp_metrics("AAPL")
     
     # Verify
-    assert result is True
-    assert os.path.exists(output_parquet)
-    df_public = pd.read_parquet(output_parquet)
-    
-    # Ticker AAPL stays.
-    # MISSING is dropped (enterprise_value is None).
-    # SHORT is dropped (summary < 50).
-    assert len(df_public) == 1
-    assert df_public.iloc[0]["ticker"] == "AAPL"
-    assert "forwardPE" in df_public.columns
-    assert "employee_count" not in df_public.columns
+    assert metrics["ebitda"] == 800000
+    assert metrics["enterprise_value"] == 5000000
 
-def test_build_private_training_table(data_loader, tmp_path):
+def test_build_universal_training_table(data_loader, tmp_path):
     # Setup dummy master CSV
     master_csv = tmp_path / "master.csv"
-    output_parquet = tmp_path / "private.parquet"
+    output_parquet = tmp_path / "universal.parquet"
     
     df = pd.DataFrame({
-        "ticker": ["PVT1", "MISSING"],
-        "enterprise_value": [100, None],
-        "employee_count": [50, 50],
-        "estimated_revenue": [1000, 1000],
-        "sector": ["Tech", "Tech"],
-        "business_summary": ["A long business summary for the private training table test" * 2, "Long enough"]
+        "ticker": ["KEEP1", "MISSING_EV", "MISSING_EBITDA", "MISSING_REV", "SHORT_SUMMARY", "KEEP2"],
+        "enterprise_value": [500_000_000, None, 500_000_000, 500_000_000, 500_000_000, 1_000_000_000],
+        "ebitda": [50_000_000, 50_000_000, None, 50_000_000, 50_000_000, 100_000_000],
+        "estimated_revenue": [100_000_000, 100_000_000, 100_000_000, None, 100_000_000, 200_000_000],
+        "total_debt": [5, 5, 5, 5, 5, 10],
+        "total_cash": [2, 2, 2, 2, 2, 4],
+        "forwardPE": [15, 15, 15, 15, 15, 30],
+        "ev_to_ebitda": [8, 8, 8, 8, 8, 16],
+        "employee_count": [100, 100, 100, 100, 100, 200],
+        "sector": ["Tech", "Tech", "Tech", "Tech", "Tech", "Finance"],
+        "business_summary": [
+            "A very long business summary that should pass the length check and is definitely more than fifty characters." * 2, 
+            "Valid length summary for missing EV test case...", 
+            "Valid length summary for missing EBITDA test case...",
+            "Valid length summary for missing Revenue test case...",
+            "Short summary",
+            "Another valid and long summary for the second keeper company in this test suite."
+        ]
     })
     df.to_csv(master_csv, index=False)
     
     # Execute
-    result = data_loader.build_private_training_table(str(master_csv), str(output_parquet))
+    result = data_loader.build_universal_training_table(str(master_csv), str(output_parquet))
     
     # Verify
     assert result is True
     assert os.path.exists(output_parquet)
-    df_private = pd.read_parquet(output_parquet)
+    df_universal = pd.read_parquet(output_parquet)
     
-    assert len(df_private) == 1
-    assert df_private.iloc[0]["ticker"] == "PVT1"
-    assert "estimated_revenue" in df_private.columns
-    assert "forwardPE" not in df_private.columns
+    # KEEP1 and KEEP2 stay.
+    # MISSING_EV is dropped.
+    # MISSING_EBITDA is dropped.
+    # MISSING_REV is dropped.
+    # SHORT_SUMMARY is dropped.
+    assert len(df_universal) == 2
+    assert list(df_universal["ticker"]) == ["KEEP1", "KEEP2"]
+    
+    # Check numeric types
+    assert pd.api.types.is_numeric_dtype(df_universal["enterprise_value"])
+    assert pd.api.types.is_numeric_dtype(df_universal["ebitda"])
+    assert pd.api.types.is_numeric_dtype(df_universal["estimated_revenue"])
