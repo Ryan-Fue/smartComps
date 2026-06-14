@@ -10,7 +10,6 @@ from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
 from sklearn.preprocessing import StandardScaler, TargetEncoder, FunctionTransformer
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.decomposition import PCA
-from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_log_error
 from sklearn.model_selection import KFold, cross_val_score
 
@@ -92,14 +91,12 @@ class ValuationEngine:
             preprocessor = ColumnTransformer(transformers)
         
         # Base XGBoost model
-        base_model = MultiOutputRegressor(
-            xgb.XGBRegressor(
-                n_estimators=self.n_estimators,
-                learning_rate=0.05,
-                max_depth=5,
-                random_state=self.random_state,
-                n_jobs=-1
-            )
+        base_model = xgb.XGBRegressor(
+            n_estimators=self.n_estimators,
+            learning_rate=0.05,
+            max_depth=5,
+            random_state=self.random_state,
+            n_jobs=-1
         )
 
         # Wrap in TransformedTargetRegressor to handle log scaling for the target
@@ -192,7 +189,7 @@ class ValuationEngine:
             # but for accuracy we keep the same structure.
             regressor = xgb.XGBRegressor(**params, random_state=self.random_state, n_jobs=-1)
             model = TransformedTargetRegressor(
-                regressor=MultiOutputRegressor(regressor),
+                regressor=regressor,
                 func=np.log1p,
                 inverse_func=safe_expm1
             )
@@ -223,7 +220,7 @@ class ValuationEngine:
         
         # Set the rest of the xgb params directly into the regressor
         best_xgb_params = {k: v for k, v in study.best_params.items() if k != 'n_estimators'}
-        self.pipeline.named_steps['model'].regressor.estimator.set_params(**best_xgb_params)
+        self.pipeline.named_steps['model'].regressor.set_params(**best_xgb_params)
         
         # Final retrain on full data
         self.logger.info("Retraining model with best hyperparameters...")
@@ -271,4 +268,6 @@ class ValuationEngine:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    print("Valuation Engine Module Upgraded to Dynamic Optuna Architecture.")
+    
+
+
