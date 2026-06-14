@@ -149,14 +149,23 @@ class FinancialDataLoader:
         self.logger.info("Building Universal Training Table...")
         df = pd.read_csv(master_csv)
 
-        # Strictly drop rows missing critical anchors (financial and NLP)
-        df = df.dropna(subset=["business_summary", "enterprise_value", "ebitda", "estimated_revenue"])
-        df = df[df['business_summary'].str.len() > 50]
-        
         # Enforce numeric types for all quantitative columns
         num_cols = ["enterprise_value", "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", "total_debt", "estimated_revenue", "employee_count"]
         for col in num_cols:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # Strictly drop rows missing critical anchors (financial and NLP)
+        df = df.dropna(subset=["business_summary", "enterprise_value", "ebitda", "estimated_revenue"])
+        df = df[df['business_summary'].str.len() > 50]
+
+        # SMART MID-MARKET FILTER: Remove extreme outliers
+        # Target Universe: $100M to $100B Enterprise Value
+        min_ev = 100_000_000
+        max_ev = 100_000_000_000
+        initial_count = len(df)
+        df = df[(df['enterprise_value'] >= min_ev) & (df['enterprise_value'] <= max_ev)]
+        removed = initial_count - len(df)
+        self.logger.info(f"Mid-Market Filter: Removed {removed} extreme outliers.")
 
         df = df.reset_index(drop=True)
         df.to_parquet(output_parquet, index=False)
