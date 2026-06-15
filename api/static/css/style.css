@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap');
+
+:root {
+    --primary-blue: #1e3a8a;
+    --text-dark: #1f2937;
+    --text-light: #6b7280;
+    --bg-light: #ffffff;
+    --border-color: #e5e7eb;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    -webkit-font-smoothing: antialiased;
+}
+
+.serif {
+    font-family: 'Playfair Display', serif;
+}
+
+.valuator-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.main-title {
+    font-size: 4rem;
+    margin-top: 0.5rem;
+    margin-bottom: 2rem;
+    color: #0f172a;
+}
+
+.interface-container {
+    max-width: 900px;
+    margin: 60px auto;
+    text-align: center;
+}
+
+/* Minimalist Inputs */
+.form-label {
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-light);
+    display: block;
+    text-align: left;
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0;
+    padding: 0.75rem 0;
+    font-size: 1rem;
+    background-color: transparent;
+    transition: border-color 0.2s;
+}
+
+.form-control:focus, .form-select:focus {
+    box-shadow: none;
+    border-color: var(--primary-blue);
+}
+
+.form-group-custom {
+    margin-bottom: 2.5rem;
+    text-align: left;
+}
+
+/* Styled Textarea */
+textarea.form-control {
+    background-color: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+/* Primary Button */
+.btn-generate {
+    background-color: var(--primary-blue);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 1.25rem;
+    width: 100%;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+    margin-top: 2rem;
+    transition: opacity 0.2s;
+}
+
+.btn-generate:hover {
+    opacity: 0.9;
+    color: white;
+}
+
+.btn-generate:disabled {
+    background-color: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* Settings/Config Section */
+.config-section {
+    background-color: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 4rem;
+    text-align: left;
+}
+
+.footer-note {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--text-light);
+    margin-top: 3rem;
+}
+
+/* Pill styling for Desired Outputs */
+.pill-container {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    min-height: 45px;
+    align-items: center;
+}
+
+.output-pill {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}

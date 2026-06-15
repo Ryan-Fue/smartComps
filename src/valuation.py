@@ -10,7 +10,6 @@ from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
 from sklearn.preprocessing import StandardScaler, TargetEncoder, FunctionTransformer
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.decomposition import PCA
-from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_log_error
 from sklearn.model_selection import KFold, cross_val_score
 
@@ -34,25 +33,47 @@ class ValuationEngine:
     quantitative financials and qualitative NLP embeddings.
     """
 
+    # --- Class Constants (Read-only defaults) ---
+    DEFAULT_FIN_COLS = (
+        "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", 
+        "total_debt", "employee_count", "estimated_revenue", "enterprise_value"
+    )
+    DEFAULT_CAT_COLS = ("sector",)
+    DEFAULT_TARGET_COLS = ("enterprise_value",)
+    DEFAULT_NLP_COLS = tuple(f"nlp_{i}" for i in range(384))
+
+    VALID_SECTORS = (
+        "Basic Materials",
+        "Communication Services",
+        "Consumer Cyclical",
+        "Consumer Defensive",
+        "Energy",
+        "Financial Services",
+        "Healthcare",
+        "Industrials",
+        "Real Estate",
+        "Technology",
+        "Unknown",
+        "Utilities"
+    )
+
     def __init__(self, 
                  fin_cols: list = None, 
                  nlp_cols: list = None, 
                  cat_cols: list = None,
                  target_cols: list = None, 
-                 n_estimators: int = 150, 
+                 n_estimators: int = 100, 
                  random_state: int = 42) -> None:
         """Initializes the ValuationEngine with dynamic feature and target support."""
         self.logger = logging.getLogger(__name__)
         self.random_state = random_state
         self.n_estimators = n_estimators
 
-        # 1. Default column sets if not provided
-        self.base_fin_cols = fin_cols if fin_cols is not None else [
-            "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", "total_debt", "employee_count", "estimated_revenue"
-        ]
-        self.base_nlp_cols = nlp_cols if nlp_cols is not None else [f"nlp_{i}" for i in range(384)]
-        self.base_cat_cols = cat_cols if cat_cols is not None else ["sector"]
-        self.target_cols = target_cols if target_cols else ["enterprise_value"]
+        # 1. Default column sets if not provided (Convert tuples to lists for internal mutation if needed)
+        self.base_fin_cols = list(fin_cols) if fin_cols is not None else list(self.DEFAULT_FIN_COLS)
+        self.base_nlp_cols = list(nlp_cols) if nlp_cols is not None else list(self.DEFAULT_NLP_COLS)
+        self.base_cat_cols = list(cat_cols) if cat_cols is not None else list(self.DEFAULT_CAT_COLS)
+        self.target_cols = list(target_cols) if target_cols is not None else list(self.DEFAULT_TARGET_COLS)
         
         # 2. Initialize current features (will be refined in prepare_data)
         self.fin_cols = []
@@ -61,6 +82,7 @@ class ValuationEngine:
         
         # 3. Build initial pipeline
         self._update_pipeline()
+
 
     def _update_pipeline(self) -> None:
         """Rebuilds the Scikit-Learn pipeline based on current feature lists."""
@@ -92,14 +114,12 @@ class ValuationEngine:
             preprocessor = ColumnTransformer(transformers)
         
         # Base XGBoost model
-        base_model = MultiOutputRegressor(
-            xgb.XGBRegressor(
-                n_estimators=self.n_estimators,
-                learning_rate=0.05,
-                max_depth=5,
-                random_state=self.random_state,
-                n_jobs=-1
-            )
+        base_model = xgb.XGBRegressor(
+            n_estimators=self.n_estimators,
+            learning_rate=0.05,
+            max_depth=5,
+            random_state=self.random_state,
+            n_jobs=-1
         )
 
         # Wrap in TransformedTargetRegressor to handle log scaling for the target
@@ -192,7 +212,7 @@ class ValuationEngine:
             # but for accuracy we keep the same structure.
             regressor = xgb.XGBRegressor(**params, random_state=self.random_state, n_jobs=-1)
             model = TransformedTargetRegressor(
-                regressor=MultiOutputRegressor(regressor),
+                regressor=regressor,
                 func=np.log1p,
                 inverse_func=safe_expm1
             )
@@ -223,7 +243,7 @@ class ValuationEngine:
         
         # Set the rest of the xgb params directly into the regressor
         best_xgb_params = {k: v for k, v in study.best_params.items() if k != 'n_estimators'}
-        self.pipeline.named_steps['model'].regressor.estimator.set_params(**best_xgb_params)
+        self.pipeline.named_steps['model'].regressor.set_params(**best_xgb_params)
         
         # Final retrain on full data
         self.logger.info("Retraining model with best hyperparameters...")
@@ -271,4 +291,6 @@ class ValuationEngine:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    print("Valuation Engine Module Upgraded to Dynamic Optuna Architecture.")
+    
+
+
