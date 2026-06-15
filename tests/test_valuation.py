@@ -33,7 +33,7 @@ def mock_ml_data():
 def test_valuation_engine_dynamic_init():
     """Verifies that the engine initializes with all base columns by default."""
     engine = ValuationEngine()
-    assert len(engine.base_fin_cols) == 7
+    assert len(engine.base_fin_cols) == 8
     assert len(engine.base_nlp_cols) == 384
     assert engine.base_cat_cols == ["sector"]
 
