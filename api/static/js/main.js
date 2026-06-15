@@ -5,7 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup button listeners
     document.getElementById('train-btn').addEventListener('click', handleTrain);
     document.getElementById('predict-btn').addEventListener('click', handlePredict);
+    
+    // Listen for summary changes for validation
+    document.getElementById('business_summary').addEventListener('input', checkInputs);
 });
+
+let configData = null;
 
 /**
  * Populate the UI
@@ -13,13 +18,19 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function initializeConfig() {
     const response = await fetch('/api/config');
-    const data = await response.json();
+    configData = await response.json();
 
     const configContainer = document.getElementById('config-container');
     const targetSelect = document.getElementById('target-select');
 
-    // Populate Checkboxes for Features
-    data.features.forEach(feature => {
+    // Combine all features for the checkbox list
+    const allFeatures = [
+        ...configData.financial_features,
+        ...configData.categorical_features,
+        ...configData.nlp_features
+    ];
+
+    allFeatures.forEach(feature => {
         const id = `feat-${feature}`;
         configContainer.innerHTML += `
             <div class="form-check me-3 text-start">
@@ -30,35 +41,41 @@ async function initializeConfig() {
     });
 
     // Populate Dropdown for Target
-    data.targets.forEach(target => {
+    configData.targets.forEach(target => {
         targetSelect.innerHTML += `<option value="${target}">${target}</option>`;
     });
 }
 
 /**
- * Collect selected features, tell the server to train, 
- * and then build the prediction inputs.
+ * The "Train Once" Logic (Now with Validation)
  */
 async function handleTrain() {
     const trainBtn = document.getElementById('train-btn');
     const statusDiv = document.getElementById('train-status');
+    const predictBtn = document.getElementById('predict-btn');
     
     // Get all checked boxes
     const selectedFeatures = Array.from(document.querySelectorAll('.form-check-input:checked'))
                                   .map(cb => cb.value);
     const target = document.getElementById('target-select').value;
 
-    trainBtn.disabled = true;
-    statusDiv.innerText = "Initializing Engine... please wait.";
+    // VALIDATION: Prevent target from being an input feature
+    if (selectedFeatures.includes(target)) {
+        statusDiv.innerHTML = `<span class="text-danger fw-bold">Error:</span> Target variable ("${target}") cannot be selected as an input feature. Please uncheck it and try again.`;
+        return;
+    }
 
-    // TODO: Actually POST these to /api/train in the next step
-    // For now, we simulate success to show you the UI generation:
+    trainBtn.disabled = true;
+    predictBtn.disabled = true; // Disable until new inputs are filled
+    statusDiv.innerHTML = `<span class="text-primary">Initializing Engine...</span>`;
+
+    // Simulate Server Delay (Next step: Replace with real Fetch call)
     setTimeout(() => {
         setupPredictionUI(selectedFeatures, target);
-        statusDiv.innerText = "Engine Ready.";
-        document.getElementById('predict-btn').disabled = false;
+        statusDiv.innerHTML = `<span class="text-success">Engine Ready.</span>`;
+        trainBtn.disabled = false; // Allow re-training
         
-        // Close the accordion automatically after training
+        // Close the accordion automatically
         const configAccordion = document.getElementById('collapseConfig');
         const bsCollapse = bootstrap.Collapse.getInstance(configAccordion) || new bootstrap.Collapse(configAccordion);
         bsCollapse.hide();
@@ -66,53 +83,76 @@ async function handleTrain() {
 }
 
 /**
- * EXERCISE 3: Dynamic Input Generation
- * This builds the "Revenue", "Employees" etc. fields 
- * ONLY for the features the user selected.
+ * Dynamic Input Generation & Validation
  */
 function setupPredictionUI(features, target) {
     const inputContainer = document.getElementById('prediction-inputs');
     const targetDisplay = document.getElementById('target-display');
     
-    inputContainer.innerHTML = ''; // Clear previous
+    inputContainer.innerHTML = ''; // Clear previous inputs
     targetDisplay.innerHTML = `<span class="output-pill">${target.replace(/_/g, ' ')} <small>&times;</small></span>`;
 
     features.forEach(feat => {
-        // Skip 'business_summary' because it has its own big textarea already
         if (feat === 'business_summary') return;
 
-        inputContainer.innerHTML += `
-            <div class="col-md-6">
-                <div class="form-group-custom">
-                    <label class="form-label">${feat.replace(/_/g, ' ')}</label>
-                    <input type="number" class="form-control predict-input" data-feature="${feat}" placeholder="0.00">
-                </div>
+        const isCategorical = configData.categorical_features.includes(feat);
+        let inputHtml = '';
+
+        if (feat === 'sector') {
+            // Render a dropdown for sector
+            inputHtml = `
+                <select class="form-select predict-input" data-feature="sector" required>
+                    <option value="" selected disabled>Choose Sector...</option>
+                    ${configData.sector_options.map(s => `<option value="${s}">${s}</option>`).join('')}
+                </select>
+            `;
+        } else {
+            const inputType = isCategorical ? 'text' : 'number';
+            const placeholder = isCategorical ? 'Enter value...' : '0.00';
+            inputHtml = `<input type="${inputType}" class="form-control predict-input" data-feature="${feat}" placeholder="${placeholder}" required>`;
+        }
+
+        const col = document.createElement('div');
+        col.className = 'col-md-6';
+        col.innerHTML = `
+            <div class="form-group-custom">
+                <label class="form-label">${feat.replace(/_/g, ' ')}</label>
+                ${inputHtml}
             </div>
         `;
+        
+        col.querySelector('.predict-input').addEventListener('input', checkInputs);
+        col.querySelector('.predict-input').addEventListener('change', checkInputs); // For select change
+        inputContainer.appendChild(col);
     });
+    
+    checkInputs();
 }
 
 /**
- * EXERCISE 4: Repeated Prediction
+ * Validation Check
+ * Enables the Predict button ONLY if all feature fields are filled.
+ */
+function checkInputs() {
+    const inputs = document.querySelectorAll('.predict-input');
+    const summary = document.getElementById('business_summary');
+    const predictBtn = document.getElementById('predict-btn');
+    
+    const allInputsFilled = Array.from(inputs).every(input => input.value.trim() !== "");
+    const summaryFilled = summary.value.trim().length > 10;
+
+    predictBtn.disabled = !(allInputsFilled && summaryFilled);
+}
+
+/**
+ * Repeated Prediction
  */
 async function handlePredict() {
     const resultDiv = document.getElementById('prediction-result');
     resultDiv.classList.remove('d-none');
     resultDiv.innerText = "Calculating Valuation...";
 
-    // 1. Gather values from all '.predict-input' elements
-    const inputs = {};
-    document.querySelectorAll('.predict-input').forEach(el => {
-        inputs[el.dataset.feature] = parseFloat(el.value) || 0;
-    });
-    
-    // 2. Add the summary
-    inputs['business_summary'] = document.getElementById('business_summary').value;
-
-    console.log("Prediction Inputs:", inputs);
-
-    // TODO: POST to /api/predict
-    // Mock result for now
+    // Mock result simulation
     setTimeout(() => {
         resultDiv.innerText = "$1,250,000,000";
     }, 800);
