@@ -13,6 +13,25 @@ document.addEventListener('DOMContentLoaded', () => {
 let configData = null;
 
 /**
+ * Helper to turn raw column names into professional labels
+ */
+function getDisplayLabel(feature) {
+    const mapping = {
+        'estimated_revenue': 'Revenue (TTM)',
+        'ebitda': 'EBITDA (TTM)',
+        'total_cash': 'Total Cash',
+        'total_debt': 'Total Debt',
+        'forwardPE': 'Forward P/E',
+        'ev_to_ebitda': 'EV / EBITDA',
+        'enterprise_value': 'Enterprise Value',
+        'employee_count': 'Employee Count',
+        'sector': 'Sector',
+        'business_summary': 'Business Summary'
+    };
+    return mapping[feature] || feature.replace(/_/g, ' ');
+}
+
+/**
  * Populate the UI
  * Fetch the features/targets and create the HTML elements.
  */
@@ -35,14 +54,14 @@ async function initializeConfig() {
         configContainer.innerHTML += `
             <div class="form-check me-3 text-start">
                 <input class="form-check-input" type="checkbox" value="${feature}" id="${id}" checked>
-                <label class="form-check-label small" for="${id}">${feature.replace(/_/g, ' ')}</label>
+                <label class="form-check-label small" for="${id}">${getDisplayLabel(feature)}</label>
             </div>
         `;
     });
 
     // Populate Dropdown for Target
     configData.targets.forEach(target => {
-        targetSelect.innerHTML += `<option value="${target}">${target.replace(/_/g, ' ')}</option>`;
+        targetSelect.innerHTML += `<option value="${target}">${getDisplayLabel(target)}</option>`;
     });
 }
 
@@ -61,7 +80,7 @@ async function handleTrain() {
 
     // VALIDATION: Prevent target from being an input feature
     if (selectedFeatures.includes(target)) {
-        statusDiv.innerHTML = `<span class="text-danger fw-bold">Error:</span> Target variable ("${target}") cannot be selected as an input feature. Please uncheck it and try again.`;
+        statusDiv.innerHTML = `<span class="text-danger fw-bold">Error:</span> Target variable ("${getDisplayLabel(target)}") cannot be selected as an input feature. Please uncheck it and try again.`;
         return;
     }
 
@@ -107,7 +126,7 @@ function setupPredictionUI(features, target) {
     const targetDisplay = document.getElementById('target-display');
     
     inputContainer.innerHTML = ''; // Clear previous inputs
-    targetDisplay.innerHTML = `<span class="output-pill">${target.replace(/_/g, ' ')} <small>&times;</small></span>`;
+    targetDisplay.innerHTML = `<span class="output-pill">${getDisplayLabel(target)} <small>&times;</small></span>`;
 
     features.forEach(feat => {
         if (feat === 'business_summary') return;
@@ -133,7 +152,7 @@ function setupPredictionUI(features, target) {
         col.className = 'col-md-6';
         col.innerHTML = `
             <div class="form-group-custom">
-                <label class="form-label">${feat.replace(/_/g, ' ')}</label>
+                <label class="form-label">${getDisplayLabel(feat)}</label>
                 ${inputHtml}
             </div>
         `;
@@ -172,7 +191,7 @@ async function handlePredict() {
     resultDiv.classList.remove('d-none');
     resultDiv.innerText = "Calculating Valuation...";
 
-    // Gather Payload
+    // 1. Gather Payload
     const payload = {
         business_summary: summary.value.trim()
     };
@@ -187,7 +206,7 @@ async function handlePredict() {
     });
 
     try {
-        // POST to API
+        // 2. POST to API
         const response = await fetch('/api/predict', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -196,7 +215,7 @@ async function handlePredict() {
 
         const result = await response.json();
 
-        // Display Result
+        // 3. Display Result
         if (result.status === 'success') {
             resultDiv.innerHTML = `<span class="fw-bold">${result.valuation}</span>`;
         } else {
