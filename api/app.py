@@ -2,17 +2,27 @@ from flask import Flask, render_template, request, jsonify
 import os
 import sys
 import pandas as pd
+import logging
+from sklearn.model_selection import train_test_split
+
+# Set up logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Add project root to sys.path so we can import src modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.valuation import ValuationEngine
+from src.embedder import FeatureProcessor
 from src.data_loader import FinancialDataLoader
 
 app = Flask(__name__)
 
 # Global engine variable to persist the model after training
 engine = None
+
+# Global processor for embedding
+processor = FeatureProcessor()
 
 @app.route('/')
 def index():
@@ -36,19 +46,50 @@ def train_model():
     selected = data.get('features', [])
     target = data.get('target', 'enterprise_value')
 
-    
+    # Sort out parameters
 
+    fin_cols = [f for f in selected if f in ValuationEngine.DEFAULT_FIN_COLS]
+    cat_cols = [f for f in selected if f in ValuationEngine.DEFAULT_CAT_COLS]
+    nlp_cols = list(ValuationEngine.DEFAULT_NLP_COLS) if 'business_summary' in selected else [] # Required but redudant check for future implimentation
 
+    try:
+        df = pd.read_parquet('data/processed/UNIVERSAL_embedded.parquet')
 
-    """
-    TODO: 
-    1. Capture 'features' and 'target' from request.json.
-    2. Map those features to fin_cols, cat_cols, and nlp_cols.
-    3. Load 'data/processed/UNIVERSAL_training.parquet' using pandas.
-    4. Instantiate the global 'engine' and run engine.train(df).
-    5. Return the resulting metrics as JSON.
-    """
-    return jsonify({"message": "Endpoint not implemented yet"})
+        # Intialize engine with user selection
+        global engine
+        engine = ValuationEngine(
+            fin_cols=fin_cols,
+            cat_cols=cat_cols,
+            nlp_cols=nlp_cols,
+            target_cols =[target]
+        )
+
+        X, y = engine.prepare_data(df, target_col=target)
+
+        # Split for accurate metrics
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+        # Light tuning and evaluate for metrics
+        engine.tune_hyperparameters(X_train, y_train, n_trials=8)
+        metrics = engine.evaluate(X_test, y_test)
+
+        # Train final model on full data set
+        engine.tune_hyperparameters(X, y, n_trials=20)
+
+        return jsonify({
+            "status": "success",
+            "metrics": metrics
+        })
+
+    except Exception as e:
+
+        logger.error(f"Training failed: {e}")
+        
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500 # Internal server error
+
 
 @app.route('/api/predict', methods=['POST'])
 def predict_valuation():
