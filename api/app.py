@@ -15,15 +15,16 @@ def index():
     """Serves the main dashboard page."""
     return render_template('index.html')
 
-# --- SKELETON ENDPOINTS (For you to implement) ---
+# --- SKELETON ENDPOINTS ---
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
-    """
-    TODO: Return a JSON object with available features and targets.
-    Hint: Look at ValuationEngine.__init__ for base column lists.
-    """
-    return jsonify({"message": "Endpoint not implemented yet"})
+
+    features = ValuationEngine.DEFAULT_FIN_COLS + ValuationEngine.DEFAULT_CAT_COLS + ("business_summary",)
+    targets = ValuationEngine.DEFAULT_FIN_COLS + ValuationEngine.DEFAULT_CAT_COLS
+
+    
+    return jsonify({"features": features, "targets": targets})
 
 @app.route('/api/train', methods=['POST'])
 def train_model():

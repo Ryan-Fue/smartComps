@@ -33,6 +33,15 @@ class ValuationEngine:
     quantitative financials and qualitative NLP embeddings.
     """
 
+    # --- Class Constants (Read-only defaults) ---
+    DEFAULT_FIN_COLS = (
+        "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", 
+        "total_debt", "employee_count", "estimated_revenue", "enterprise_value"
+    )
+    DEFAULT_CAT_COLS = ("sector",)
+    DEFAULT_TARGET_COLS = ("enterprise_value",)
+    DEFAULT_NLP_COLS = tuple(f"nlp_{i}" for i in range(384))
+
     def __init__(self, 
                  fin_cols: list = None, 
                  nlp_cols: list = None, 
@@ -45,13 +54,11 @@ class ValuationEngine:
         self.random_state = random_state
         self.n_estimators = n_estimators
 
-        # 1. Default column sets if not provided
-        self.base_fin_cols = fin_cols if fin_cols is not None else [
-            "forwardPE", "ev_to_ebitda", "ebitda", "total_cash", "total_debt", "employee_count", "estimated_revenue"
-        ]
-        self.base_nlp_cols = nlp_cols if nlp_cols is not None else [f"nlp_{i}" for i in range(384)]
-        self.base_cat_cols = cat_cols if cat_cols is not None else ["sector"]
-        self.target_cols = target_cols if target_cols else ["enterprise_value"]
+        # 1. Default column sets if not provided (Convert tuples to lists for internal mutation if needed)
+        self.base_fin_cols = list(fin_cols) if fin_cols is not None else list(self.DEFAULT_FIN_COLS)
+        self.base_nlp_cols = list(nlp_cols) if nlp_cols is not None else list(self.DEFAULT_NLP_COLS)
+        self.base_cat_cols = list(cat_cols) if cat_cols is not None else list(self.DEFAULT_CAT_COLS)
+        self.target_cols = list(target_cols) if target_cols is not None else list(self.DEFAULT_TARGET_COLS)
         
         # 2. Initialize current features (will be refined in prepare_data)
         self.fin_cols = []
@@ -60,6 +67,7 @@ class ValuationEngine:
         
         # 3. Build initial pipeline
         self._update_pipeline()
+
 
     def _update_pipeline(self) -> None:
         """Rebuilds the Scikit-Learn pipeline based on current feature lists."""
