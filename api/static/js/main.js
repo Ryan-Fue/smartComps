@@ -66,7 +66,7 @@ async function initializeConfig() {
 }
 
 /**
- * The "Train Once" Logic (Now with Validation)
+ * The "Train Once" Logic 
  */
 async function handleTrain() {
     const trainBtn = document.getElementById('train-btn');
@@ -102,8 +102,17 @@ async function handleTrain() {
 
         if (result.status === 'success') {
             setupPredictionUI(selectedFeatures, target);
-            statusDiv.innerHTML = `<span class="text-success">Engine Ready. (R2: ${result.metrics.r2.toFixed(2)})</span>`;
+            statusDiv.innerHTML = `<span class="text-success">Engine Ready.</span>`;
             
+            // Display MAPE below the accordion
+            const metricsDisplay = document.getElementById('metrics-display');
+            const mapeScore = document.getElementById('mape-score');
+            
+            // Format MAPE as a percentage (assuming it's a decimal like 0.15)
+            const mapePercent = (result.metrics.mape * 100).toFixed(1);
+            mapeScore.innerText = `MAPE: ${mapePercent}%`;
+            metricsDisplay.classList.remove('d-none');
+
             // Close the accordion automatically
             const configAccordion = document.getElementById('collapseConfig');
             const bsCollapse = bootstrap.Collapse.getInstance(configAccordion) || new bootstrap.Collapse(configAccordion);

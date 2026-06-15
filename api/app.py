@@ -71,7 +71,7 @@ def train_model():
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
         # Light tuning and evaluate for metrics
-        engine.tune_hyperparameters(X_train, y_train, n_trials=8)
+        engine.tune_hyperparameters(X_train, y_train, n_trials=15)
         metrics = engine.evaluate(X_test, y_test)
 
         # Train final model on full data set

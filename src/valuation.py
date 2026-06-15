@@ -62,7 +62,7 @@ class ValuationEngine:
                  nlp_cols: list = None, 
                  cat_cols: list = None,
                  target_cols: list = None, 
-                 n_estimators: int = 150, 
+                 n_estimators: int = 100, 
                  random_state: int = 42) -> None:
         """Initializes the ValuationEngine with dynamic feature and target support."""
         self.logger = logging.getLogger(__name__)
