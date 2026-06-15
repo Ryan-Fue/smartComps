@@ -20,7 +20,7 @@ def index():
 @app.route('/api/config', methods=['GET'])
 def get_config():
 
-    features = ValuationEngine.DEFAULT_FIN_COLS + ValuationEngine.DEFAULT_CAT_COLS + ("business_summary",)
+    features = ValuationEngine.DEFAULT_FIN_COLS + ValuationEngine.DEFAULT_CAT_COLS
     targets = ValuationEngine.DEFAULT_FIN_COLS + ValuationEngine.DEFAULT_CAT_COLS
 
     
