@@ -35,14 +35,14 @@ async function initializeConfig() {
         configContainer.innerHTML += `
             <div class="form-check me-3 text-start">
                 <input class="form-check-input" type="checkbox" value="${feature}" id="${id}" checked>
-                <label class="form-check-label small" for="${id}">${feature}</label>
+                <label class="form-check-label small" for="${id}">${feature.replace(/_/g, ' ')}</label>
             </div>
         `;
     });
 
     // Populate Dropdown for Target
     configData.targets.forEach(target => {
-        targetSelect.innerHTML += `<option value="${target}">${target}</option>`;
+        targetSelect.innerHTML += `<option value="${target}">${target.replace(/_/g, ' ')}</option>`;
     });
 }
 
@@ -69,17 +69,29 @@ async function handleTrain() {
     predictBtn.disabled = true; // Disable until new inputs are filled
     statusDiv.innerHTML = `<span class="text-primary">Initializing Engine...</span>`;
 
-    // Simulate Server Delay (Next step: Replace with real Fetch call)
-    setTimeout(() => {
-        setupPredictionUI(selectedFeatures, target);
-        statusDiv.innerHTML = `<span class="text-success">Engine Ready.</span>`;
-        trainBtn.disabled = false; // Allow re-training
-        
-        // Close the accordion automatically
-        const configAccordion = document.getElementById('collapseConfig');
-        const bsCollapse = bootstrap.Collapse.getInstance(configAccordion) || new bootstrap.Collapse(configAccordion);
-        bsCollapse.hide();
-    }, 1000);
+    // Posts selection to engine and 
+    const response = await fetch('/api/train', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+             features: selectedFeatures,
+             target: target
+         })
+     });
+    const result = await response.json();
+
+    // Generate the new inputs for the prediction form
+    setupPredictionUI(selectedFeatures, target);
+    
+    // Clear the "Initializing..." message
+    statusDiv.innerHTML = `<span class="text-success">Engine Ready. (R2: ${result.metrics.r2.toFixed(2)})</span>`;
+    
+    // Close the accordion so the user sees the new form
+    const configAccordion = document.getElementById('collapseConfig');
+    const bsCollapse = bootstrap.Collapse.getInstance(configAccordion) || new bootstrap.Collapse(configAccordion);
+    bsCollapse.hide();
+
+
 }
 
 /**

@@ -31,6 +31,15 @@ def get_config():
 
 @app.route('/api/train', methods=['POST'])
 def train_model():
+
+    data = request.json
+    selected = data.get('features', [])
+    target = data.get('target', 'enterprise_value')
+
+    
+
+
+
     """
     TODO: 
     1. Capture 'features' and 'target' from request.json.
