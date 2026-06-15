@@ -69,29 +69,34 @@ async function handleTrain() {
     predictBtn.disabled = true; // Disable until new inputs are filled
     statusDiv.innerHTML = `<span class="text-primary">Initializing Engine...</span>`;
 
-    // Posts selection to engine and 
-    const response = await fetch('/api/train', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-             features: selectedFeatures,
-             target: target
-         })
-     });
-    const result = await response.json();
+    try {
+        const response = await fetch('/api/train', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                features: selectedFeatures,
+                target: target
+            })
+        });
 
-    // Generate the new inputs for the prediction form
-    setupPredictionUI(selectedFeatures, target);
-    
-    // Clear the "Initializing..." message
-    statusDiv.innerHTML = `<span class="text-success">Engine Ready. (R2: ${result.metrics.r2.toFixed(2)})</span>`;
-    
-    // Close the accordion so the user sees the new form
-    const configAccordion = document.getElementById('collapseConfig');
-    const bsCollapse = bootstrap.Collapse.getInstance(configAccordion) || new bootstrap.Collapse(configAccordion);
-    bsCollapse.hide();
+        const result = await response.json();
 
-
+        if (result.status === 'success') {
+            setupPredictionUI(selectedFeatures, target);
+            statusDiv.innerHTML = `<span class="text-success">Engine Ready. (R2: ${result.metrics.r2.toFixed(2)})</span>`;
+            
+            // Close the accordion automatically
+            const configAccordion = document.getElementById('collapseConfig');
+            const bsCollapse = bootstrap.Collapse.getInstance(configAccordion) || new bootstrap.Collapse(configAccordion);
+            bsCollapse.hide();
+        } else {
+            statusDiv.innerHTML = `<span class="text-danger">Error: ${result.message}</span>`;
+        }
+    } catch (err) {
+        statusDiv.innerHTML = `<span class="text-danger">Failed to connect to server.</span>`;
+    } finally {
+        trainBtn.disabled = false;
+    }
 }
 
 /**
@@ -161,11 +166,43 @@ function checkInputs() {
  */
 async function handlePredict() {
     const resultDiv = document.getElementById('prediction-result');
+    const summary = document.getElementById('business_summary');
+    const inputs = document.querySelectorAll('.predict-input');
+    
     resultDiv.classList.remove('d-none');
     resultDiv.innerText = "Calculating Valuation...";
 
-    // Mock result simulation
-    setTimeout(() => {
-        resultDiv.innerText = "$1,250,000,000";
-    }, 800);
+    // Gather Payload
+    const payload = {
+        business_summary: summary.value.trim()
+    };
+
+    inputs.forEach(input => {
+        const feat = input.dataset.feature;
+        const val = input.value.trim();
+        
+        // Convert numbers if not a categorical field
+        const isFinancial = configData.financial_features.includes(feat);
+        payload[feat] = isFinancial ? parseFloat(val) : val;
+    });
+
+    try {
+        // POST to API
+        const response = await fetch('/api/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        // Display Result
+        if (result.status === 'success') {
+            resultDiv.innerHTML = `<span class="fw-bold">${result.valuation}</span>`;
+        } else {
+            resultDiv.innerHTML = `<span class="text-danger small">Error: ${result.message}</span>`;
+        }
+    } catch (err) {
+        resultDiv.innerHTML = `<span class="text-danger small">Connection error.</span>`;
+    }
 }

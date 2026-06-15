@@ -93,6 +93,10 @@ def train_model():
 
 @app.route('/api/predict', methods=['POST'])
 def predict_valuation():
+
+    
+
+
     """
     TODO: 
     1. Check if the global 'engine' exists.
