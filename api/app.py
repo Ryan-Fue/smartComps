@@ -34,7 +34,7 @@ def get_config():
     return jsonify({
         "financial_features": ValuationEngine.DEFAULT_FIN_COLS,
         "categorical_features": ValuationEngine.DEFAULT_CAT_COLS,
-        "targets": ValuationEngine.DEFAULT_FIN_COLS + ValuationEngine.DEFAULT_CAT_COLS,
+        "targets": [col for col in ValuationEngine.DEFAULT_FIN_COLS if col != "employee_count"],
         "nlp_features": ["business_summary"],
         "sector_options": ValuationEngine.VALID_SECTORS
     })
@@ -42,17 +42,18 @@ def get_config():
 @app.route('/api/train', methods=['POST'])
 def train_model():
 
-    data = request.json
-    selected = data.get('features', [])
-    target = data.get('target', 'enterprise_value')
-
-    # Sort out parameters
-
-    fin_cols = [f for f in selected if f in ValuationEngine.DEFAULT_FIN_COLS]
-    cat_cols = [f for f in selected if f in ValuationEngine.DEFAULT_CAT_COLS]
-    nlp_cols = list(ValuationEngine.DEFAULT_NLP_COLS) if 'business_summary' in selected else [] # Required but redudant check for future implimentation
-
     try:
+
+        data = request.json
+        selected = data.get('features', [])
+        target = data.get('target', 'enterprise_value')
+
+        # Sort out parameters
+
+        fin_cols = [f for f in selected if f in ValuationEngine.DEFAULT_FIN_COLS]
+        cat_cols = [f for f in selected if f in ValuationEngine.DEFAULT_CAT_COLS]
+        nlp_cols = list(ValuationEngine.DEFAULT_NLP_COLS) if 'business_summary' in selected else [] # Required but redudant check for future implimentation
+    
         df = pd.read_parquet('data/processed/UNIVERSAL_embedded.parquet')
 
         # Intialize engine with user selection
@@ -93,18 +94,49 @@ def train_model():
 
 @app.route('/api/predict', methods=['POST'])
 def predict_valuation():
+    global engine, processor
 
+    if engine is None:
+        return jsonify({"status": "error", "message": "Model not trained yet"}), 400
     
+    try:
+        # Convert user input into a single-row DataFrame
+        input_data = request.json
+        df_input = pd.DataFrame(input_data, index = [0])
 
+        # If the user provided a business summary AND we trained with NLP
+        if 'business_summary' in df_input.columns and engine.nlp_cols:
+            # Convert into 384 numbers
+            df_input = processor.embed_summaries(df_input)
+        
+        # Run prediction
+        prediction_df = engine.predict(df_input)
+        val = prediction_df.iloc[0, 0] # Grab the single result -> in this format since might have multiple outputs later
 
-    """
-    TODO: 
-    1. Check if the global 'engine' exists.
-    2. Convert request.json into a single-row pandas DataFrame.
-    3. (Advanced) If business_summary is used, embed it using FeatureProcessor.
-    4. Run engine.predict(df_input) and return the result.
-    """
-    return jsonify({"message": "Endpoint not implemented yet"})
+        # Return formatted value
+        target_name = engine.target_cols[0]
+        is_currency = any(kw in target_name.lower() for kw in ['value', 'total', 'revenue', 'cash', 'debt'])
+
+        if is_currency:
+            # Format as: $1,250,000,000
+            formatted_val = f"${val:,.0f}"
+        else:
+            # Format as a regular decimal: 15.42 (e.g., for PE ratios or EBITDA multiples)
+            formatted_val = f"{val:,.2f}"
+        
+        return jsonify({
+            "status": "success",
+            "valuation": formatted_val
+        })
+
+    except Exception as e:
+
+        logger.error(f"Prediction failed: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
