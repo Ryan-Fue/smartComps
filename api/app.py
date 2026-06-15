@@ -73,6 +73,9 @@ def train_model():
         # Light tuning and evaluate for metrics
         engine.tune_hyperparameters(X_train, y_train, n_trials=15)
         metrics = engine.evaluate(X_test, y_test)
+        
+        # Persist metrics for range calculation
+        engine.last_metrics = metrics
 
         # Train final model on full data set
         engine.tune_hyperparameters(X, y, n_trials=20)
@@ -111,22 +114,28 @@ def predict_valuation():
         
         # Run prediction
         prediction_df = engine.predict(df_input)
-        val = prediction_df.iloc[0, 0] # Grab the single result -> in this format since might have multiple outputs later
+        val = prediction_df.iloc[0, 0]
+
+        # Calculate Range using MDAPE
+        mdape = engine.last_metrics.get('mdape', 0.5) # Default to 50% if missing
+        lower_bound = val * (1 - mdape)
+        upper_bound = val * (1 + mdape)
 
         # Return formatted value
         target_name = engine.target_cols[0]
         is_currency = any(kw in target_name.lower() for kw in ['value', 'total', 'revenue', 'cash', 'debt'])
 
         if is_currency:
-            # Format as: $1,250,000,000
+            formatted_range = f"${lower_bound:,.0f} - ${upper_bound:,.0f}"
             formatted_val = f"${val:,.0f}"
         else:
-            # Format as a regular decimal: 15.42 (e.g., for PE ratios or EBITDA multiples)
+            formatted_range = f"{lower_bound:,.2f} - {upper_bound:,.2f}"
             formatted_val = f"{val:,.2f}"
         
         return jsonify({
             "status": "success",
-            "valuation": formatted_val
+            "valuation": formatted_val,
+            "valuation_range": formatted_range
         })
 
     except Exception as e:
