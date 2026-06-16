@@ -3,21 +3,22 @@
 `smartComps` is an automated, high-performance quantitative pipeline designed to ingest, sanitize, and enrich massive datasets of public company financials and SEC filings. The system synthesizes hard financial multiples with high-dimensional NLP embeddings to predict company valuations with institutional-grade precision.
 
 <img width="445" height="593" alt="image" src="https://github.com/user-attachments/assets/43e070db-ecc8-4828-a625-2002ceaa044e" />
-<img width="859" height="559" alt="image" src="https://github.com/user-attachments/assets/d0143bda-272e-40b0-8fbd-1587d62cf78f" />
+<img width="520" height="340" alt="image" src="https://github.com/user-attachments/assets/d0143bda-272e-40b0-8fbd-1587d62cf78f" />
 
 ---
 
 ## 🚀 Key Features
 
-*   **Medallion Data Architecture:** Strict Bronze → Gold → Platinum data flow ensures data integrity and prevents training leaks.
-*   **NLP-Enhanced Valuation:** Utilizes `all-mpnet-base-v2` transformer embeddings to vectorize qualitative business summaries, adding a "contextual" layer to traditional valuation.
-*   **Dynamic Modeling Engine:** A custom Scikit-Learn pipeline that automatically adapts to available features, utilizing **XGBoost** and **Optuna** for Bayesian hyperparameter optimization.
-*   **Resilient Ingestion:** Batched SEC EDGAR and Yahoo Finance data collection with built-in retry logic and exponential cooldowns.
-*   **Production Ready:** Fully containerized with Docker and a multi-stage build, served via Gunicorn.
+- **Schema-Agnostic Modular Pipeline**: Built for flexibility, the engine supports **dynamic configuration** of both inputs and targets.
+- **Configurable Target Variables**: The regression objective is not hardcoded. While it defaults to Enterprise Value, the system supports **target variable 
+- **High-Dimensional NLP Enrichment**: Utilizes `all-mpnet-base-v2` to vectorize business summaries, capturing qualitative signals often missed by traditional models.
+- **Bayesian Hyperparameter Optimization**: Leverages **Optuna** for automated, high-performance tuning of the underlying XGBoost regressor.
+- **Fault-Tolerant Data Ingestion**: Robust Bronze-layer harvesting from SEC EDGAR and Yahoo Finance with integrated retry logic and exponential cooldowns.
+- **Mathematical Stability**: Implements symmetric log-transformations and `TransformedTargetRegressor` to handle skewed financial distributions and ensure non-negative valuations.
 
 ---
 
-## 🏗 Pipeline Architecture
+## 🏗 Medallion Architecture
 
 ### 1. Bronze Layer (Ingestion)
 Fetches raw data from SEC EDGAR and Yahoo Finance. Implements fault-tolerant chunking and a Dead Letter Queue (DLQ) for failed tickers.
@@ -43,7 +44,7 @@ The core ML pipeline:
 ### Local Development
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/smartComps.git
+   git clone https://github.com/Ryan-Fue/smartComps.git
    cd smartComps
    ```
 
@@ -109,7 +110,7 @@ The dashboard will be available at `http://localhost:5000`.
 
 ---
 
-## 🛡 License
+## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
