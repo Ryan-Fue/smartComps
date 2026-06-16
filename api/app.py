@@ -56,6 +56,9 @@ def train_model():
     
         df = pd.read_parquet('data/processed/UNIVERSAL_embedded.parquet')
 
+        # Filter for positive valuations to ensure log-transform stability
+        df = df[df[target] > 0]
+
         # Intialize engine with user selection
         global engine
         engine = ValuationEngine(
@@ -67,15 +70,18 @@ def train_model():
 
         X, y = engine.prepare_data(df, target_col=target)
 
-        # Split for accurate metrics
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        # Split for accurate metrics (fixed random_state for consistency)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Light tuning and evaluate for metrics
-        engine.tune_hyperparameters(X_train, y_train, n_trials=15)
+        # Tune on training set (find best params once)
+        engine.tune_hyperparameters(X_train, y_train, n_trials=25)
         metrics = engine.evaluate(X_test, y_test)
+        
+        # Persist metrics for range calculation
+        engine.last_metrics = metrics
 
-        # Train final model on full data set
-        engine.tune_hyperparameters(X, y, n_trials=20)
+        # Retrain final model on full dataset using best params (very fast)
+        engine.train(X, y)
 
         return jsonify({
             "status": "success",
@@ -111,22 +117,28 @@ def predict_valuation():
         
         # Run prediction
         prediction_df = engine.predict(df_input)
-        val = prediction_df.iloc[0, 0] # Grab the single result -> in this format since might have multiple outputs later
+        val = prediction_df.iloc[0, 0]
+
+        # Calculate Range using MDAPE
+        mdape = engine.last_metrics.get('mdape', 0.5) # Default to 50% if missing
+        lower_bound = val * (1 - mdape)
+        upper_bound = val * (1 + mdape)
 
         # Return formatted value
         target_name = engine.target_cols[0]
         is_currency = any(kw in target_name.lower() for kw in ['value', 'total', 'revenue', 'cash', 'debt'])
 
         if is_currency:
-            # Format as: $1,250,000,000
+            formatted_range = f"${lower_bound:,.0f} - ${upper_bound:,.0f}"
             formatted_val = f"${val:,.0f}"
         else:
-            # Format as a regular decimal: 15.42 (e.g., for PE ratios or EBITDA multiples)
+            formatted_range = f"{lower_bound:,.2f} - {upper_bound:,.2f}"
             formatted_val = f"{val:,.2f}"
         
         return jsonify({
             "status": "success",
-            "valuation": formatted_val
+            "valuation": formatted_val,
+            "valuation_range": formatted_range
         })
 
     except Exception as e:
@@ -139,4 +151,4 @@ def predict_valuation():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

@@ -32,8 +32,8 @@ def test_embed_summaries(processor, sample_df):
     nlp_columns = [col for col in df_emb.columns if col.startswith("nlp_")]
     
     assert "nlp_0" in df_emb.columns
-    assert "nlp_383" in df_emb.columns
-    assert len(nlp_columns) == 384 
+    assert "nlp_767" in df_emb.columns
+    assert len(nlp_columns) == 768 
 
 def test_drop_extra_columns(processor, sample_df):
     # Test that metadata is dropped but features like 'sector' are kept
@@ -64,7 +64,7 @@ def test_process_pipeline_universal(processor, sample_df, tmp_path):
     df_processed = pd.read_parquet(output_path)
     
     # Verify embeddings exist
-    nlp_cols = ["nlp_" + str(i) for i in range(384)]
+    nlp_cols = ["nlp_" + str(i) for i in range(768)]
     assert set(nlp_cols).issubset(df_processed.columns)
     
     # Verify column management

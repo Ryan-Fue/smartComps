@@ -104,13 +104,18 @@ async function handleTrain() {
             setupPredictionUI(selectedFeatures, target);
             statusDiv.innerHTML = `<span class="text-success">Engine Ready.</span>`;
             
-            // Display MAPE below the accordion
+            // Display MDAPE & R2 below the accordion
             const metricsDisplay = document.getElementById('metrics-display');
-            const mapeScore = document.getElementById('mape-score');
+            const mdapeScore = document.getElementById('mdape-score');
+            const r2Score = document.getElementById('r2-score');
             
-            // Format MAPE as a percentage (assuming it's a decimal like 0.15)
-            const mapePercent = (result.metrics.mape * 100).toFixed(1);
-            mapeScore.innerText = `MAPE: ${mapePercent}%`;
+            // Format MDAPE as a percentage (assuming it's a decimal like 0.15)
+            const mdapePercent = (result.metrics.mdape * 100).toFixed(1);
+            mdapeScore.innerText = `MDAPE: ${mdapePercent}%`;
+            
+            // Format R2 to two decimal places
+            r2Score.innerText = `R²: ${result.metrics.r2.toFixed(2)}`;
+            
             metricsDisplay.classList.remove('d-none');
 
             // Close the accordion automatically
@@ -226,7 +231,12 @@ async function handlePredict() {
 
         // 3. Display Result
         if (result.status === 'success') {
-            resultDiv.innerHTML = `<span class="fw-bold">${result.valuation}</span>`;
+            resultDiv.innerHTML = `
+                <div class="fw-bold">${result.valuation}</div>
+                <div class="text-muted small mt-2 serif" style="font-size: 1.2rem;">
+                    Confidence Range: <span class="text-dark">${result.valuation_range}</span>
+                </div>
+            `;
         } else {
             resultDiv.innerHTML = `<span class="text-danger small">Error: ${result.message}</span>`;
         }

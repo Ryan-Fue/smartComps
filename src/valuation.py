@@ -40,7 +40,7 @@ class ValuationEngine:
     )
     DEFAULT_CAT_COLS = ("sector",)
     DEFAULT_TARGET_COLS = ("enterprise_value",)
-    DEFAULT_NLP_COLS = tuple(f"nlp_{i}" for i in range(384))
+    DEFAULT_NLP_COLS = tuple(f"nlp_{i}" for i in range(768))
 
     VALID_SECTORS = (
         "Basic Materials",
@@ -69,18 +69,18 @@ class ValuationEngine:
         self.random_state = random_state
         self.n_estimators = n_estimators
 
-        # 1. Default column sets if not provided (Convert tuples to lists for internal mutation if needed)
+        # Default column sets if not provided (Convert tuples to lists for internal mutation if needed)
         self.base_fin_cols = list(fin_cols) if fin_cols is not None else list(self.DEFAULT_FIN_COLS)
         self.base_nlp_cols = list(nlp_cols) if nlp_cols is not None else list(self.DEFAULT_NLP_COLS)
         self.base_cat_cols = list(cat_cols) if cat_cols is not None else list(self.DEFAULT_CAT_COLS)
         self.target_cols = list(target_cols) if target_cols is not None else list(self.DEFAULT_TARGET_COLS)
         
-        # 2. Initialize current features (will be refined in prepare_data)
+        # Initialize current features (will be refined in prepare_data)
         self.fin_cols = []
         self.nlp_cols = []
         self.cat_cols = []
         
-        # 3. Build initial pipeline
+        # Build initial pipeline
         self._update_pipeline()
 
 
@@ -104,7 +104,7 @@ class ValuationEngine:
         if self.nlp_cols:
             transformers.append(("nlp_prep", Pipeline([
                 ("imputer", SimpleImputer(strategy='mean')),
-                ("pca", PCA(n_components=min(10, len(self.nlp_cols)), random_state=self.random_state))
+                ("pca", PCA(n_components=min(50, len(self.nlp_cols)), random_state=self.random_state))
             ]), self.nlp_cols))
 
         if not transformers:
@@ -136,6 +136,28 @@ class ValuationEngine:
         """Dynamically adapts the engine to the provided dataframe's available features and target."""
         self.logger.info("Preparing data for modeling...")
         
+        # 1. Create Derived Features (Ratios)
+        if "ebitda" in self.base_fin_cols and "estimated_revenue" in self.base_fin_cols:
+            df["ebitda_margin"] = df["ebitda"] / (df["estimated_revenue"] + 1)
+            if "ebitda_margin" not in self.base_fin_cols:
+                self.base_fin_cols.append("ebitda_margin")
+
+            # Create Sector-Margin Interactions (Contextual accuracy)
+            if "sector" in df.columns:
+                # Use a stable set of sectors to ensure consistent columns across train/predict
+                for sec in self.VALID_SECTORS:
+                    clean_sec = str(sec).replace(" ", "_").replace("-", "").replace("&", "and")
+                    col_name = f"margin_{clean_sec}"
+                    # Multiply margin by boolean sector mask (1 or 0)
+                    df[col_name] = (df["sector"] == sec).astype(float) * df["ebitda_margin"]
+                    if col_name not in self.base_fin_cols:
+                        self.base_fin_cols.append(col_name)
+
+        if "total_debt" in self.base_fin_cols and "estimated_revenue" in self.base_fin_cols:
+            df["debt_to_revenue"] = df["total_debt"] / (df["estimated_revenue"] + 1)
+            if "debt_to_revenue" not in self.base_fin_cols:
+                self.base_fin_cols.append("debt_to_revenue")
+
         requested_targets = [target_col] if target_col else self.target_cols
         available_targets = [c for c in requested_targets if c in df.columns]
         
@@ -184,8 +206,18 @@ class ValuationEngine:
         return X, y
 
     def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame) -> None:
-        """Trains the valuation model."""
+        """Trains the valuation model with dynamic PCA adjustment for sample size."""
         self.logger.info(f"Training model on {len(X_train)} samples with {X_train.shape[1]} features...")
+        
+        # Ensure PCA components don't exceed sample size
+        if self.nlp_cols:
+            preprocess = self.pipeline.named_steps['preprocess']
+            for name, trans, _ in preprocess.transformers:
+                if name == 'nlp_prep':
+                    pca = trans.named_steps['pca']
+                    pca.n_components = min(50, X_train.shape[0], len(self.nlp_cols))
+                    break
+        
         self.pipeline.fit(X_train, y_train)
 
     def tune_hyperparameters(self, 
@@ -195,6 +227,16 @@ class ValuationEngine:
                              timeout: int = 600) -> dict:
         """Uses Optuna to find the best hyperparameters and automatically updates the pipeline."""
         self.logger.info(f"Starting Optuna optimization (n_trials={n_trials})...")
+        
+        # Pre-adjust PCA for cross-validation stability
+        if self.nlp_cols:
+            preprocess = self.pipeline.named_steps['preprocess']
+            for name, trans, _ in preprocess.transformers:
+                if name == 'nlp_prep':
+                    pca = trans.named_steps['pca']
+                    # Use a slightly more conservative sample count for CV folds (3 splits -> 2/3 samples per fit)
+                    pca.n_components = min(50, int(X_train.shape[0] * 0.6), len(self.nlp_cols))
+                    break
 
         def objective(trial):
             # Define hyperparameter search space
@@ -254,7 +296,15 @@ class ValuationEngine:
 
     def predict(self, X_new: pd.DataFrame) -> pd.DataFrame:
         """Generates predictions and clips them to realistic valuation bounds."""
-        preds = self.pipeline.predict(X_new)
+        X_pred = X_new.copy()
+        
+        if "ebitda" in X_pred.columns and "estimated_revenue" in X_pred.columns:
+            X_pred["ebitda_margin"] = X_pred["ebitda"] / (X_pred["estimated_revenue"] + 1)
+
+        if "total_debt" in X_pred.columns and "estimated_revenue" in X_pred.columns:
+            X_pred["debt_to_revenue"] = X_pred["total_debt"] / (X_pred["estimated_revenue"] + 1)
+
+        preds = self.pipeline.predict(X_pred)
         if preds.ndim == 1:
             preds = preds.reshape(-1, 1)
         
@@ -290,7 +340,63 @@ class ValuationEngine:
         self.pipeline = joblib.load(file_path)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    import os
+    from sklearn.model_selection import train_test_split
     
+    # Setup production logging
+    logging.basicConfig(
+        level=logging.INFO, 
+        filename="log.log", 
+        filemode="a", 
+        format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    
+    # Add console output for real-time monitoring
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    logging.getLogger("").addHandler(console)
+
+    logger = logging.getLogger(__name__)
+    
+    # Define paths
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_path = os.path.join(project_root, "data", "processed", "UNIVERSAL_embedded.parquet")
+    model_dir = os.path.join(project_root, "models")
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, "valuation_pipeline.joblib")
+
+    if os.path.exists(input_path):
+        logger.info(f"Loading embedded data from {input_path}...")
+        df = pd.read_parquet(input_path)
+        
+        # Initialize Engine with NLP and Core Features
+        engine = ValuationEngine(
+            fin_cols=["forwardPE", "ebitda", "total_cash", "total_debt", "estimated_revenue"],
+            cat_cols=["sector"],
+            nlp_cols=list(ValuationEngine.DEFAULT_NLP_COLS)
+        )
+        
+        # Prepare Data (This will automatically generate ebitda_margin and debt_to_revenue)
+        X, y = engine.prepare_data(df)
+        
+        # Split data for evaluation
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Hyperparameter Tuning
+        logger.info("Starting hyperparameter tuning (30 trials)...")
+        engine.tune_hyperparameters(X_train, y_train, n_trials=30)
+        
+        # Final Evaluation
+        logger.info("Evaluating optimized model...")
+        metrics = engine.evaluate(X_test, y_test)
+        logger.info(f"Final Test Metrics: {metrics}")
+        
+        # Save Model
+        logger.info(f"Saving model to {model_path}...")
+        engine.save_model(model_path)
+        logger.info("Universal Valuation Model applied and saved successfully.")
+        
+    else:
+        logger.warning(f"Embedded input {input_path} not found. Ensure src/data_loader.py and src/embedder.py have been run.")
 
 

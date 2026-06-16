@@ -23,7 +23,14 @@
         <div class="valuator-label">smartComps Valuator</div>
         
         <!-- Header Section -->
-        <h1 class="main-title serif">Valuation Interface <span style="font-size: 2rem; vertical-align: middle; color: #1e3a8a; cursor: help;">&#9432;</span></h1>
+        <h1 class="main-title serif">
+            Valuation Interface 
+            <span style="font-size: 2rem; vertical-align: middle; color: #1e3a8a; cursor: pointer;" 
+                  data-bs-toggle="modal" data-bs-target="#aboutModal" 
+                  title="Click to learn how to use this tool">
+                &#9432;
+            </span>
+        </h1>
 
         <!-- Step 1: Model Setup (Collapsible Configuration) -->
         <div class="accordion mb-5" id="setupAccordion">
@@ -58,10 +65,13 @@
 
         <!-- Model Performance Metrics (Shown after training) -->
         <div id="metrics-display" class="mb-5 d-none">
-            <div class="p-3 bg-light rounded-3 border-start border-4 border-primary">
-                <div class="valuator-label text-primary">Model Performance</div>
-                <div id="mape-score" class="h4 serif mb-0">MAPE: --%</div>
-                <div class="text-muted small">Based on unseen mid-market test data.</div>
+            <div class="p-4 bg-white rounded-3 border border-1 shadow-sm mx-auto" style="border-top: 4px solid var(--bfb-navy) !important; max-width: 600px;">
+                <div class="valuator-label text-center mb-2" style="color: var(--text-muted); cursor: help;" title="Performance metrics calculated on a held-out test set of companies.">Model Performance</div>
+                <div class="d-flex gap-5 justify-content-center align-items-center">
+                    <div id="mdape-score" class="h4 serif mb-0" style="cursor: help;" title="Median Absolute Percentage Error">MDAPE: --%</div>
+                    <div id="r2-score" class="h4 serif mb-0" style="cursor: help;" title="Coefficient of Determination (R-squared)">R²: --</div>
+                </div>
+                <div class="text-muted small mt-2 text-center">Based on unseen mid-market test data.</div>
             </div>
         </div>
 
@@ -116,7 +126,100 @@
             </div>
 
             <div class="footer-note">
-                Quantitative predictions are generated via the smartComps hybrid regression pipeline.
+                <div class="mb-3">
+                    Quantitative predictions are generated via the smartComps hybrid regression pipeline.
+                </div>
+                <div class="d-flex justify-content-center gap-3 small">
+                    <a href="#" class="text-muted text-decoration-none" data-bs-toggle="modal" data-bs-target="#termsModal">Terms of Service</a>
+                    <span class="text-muted">|</span>
+                    <a href="#" class="text-muted text-decoration-none" data-bs-toggle="modal" data-bs-target="#privacyModal">Privacy Policy</a>
+                </div>
+                <div class="mt-4 text-muted" style="font-size: 0.75rem;">
+                    &copy; 2026 smartComps. Built for personal educational purposes.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div class="modal fade" id="aboutModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title serif fw-bold">About smartComps</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-start p-4">
+                    <p class="mb-4">
+                        <strong>smartComps</strong> is a valuation engine that uses Machine Learning to estimate company valuations. 
+                        It uniquely synthesizes hard financial multiples (Ex. Revenue, EBITDA) with high-dimensional <strong>NLP (Natural Language Processing)</strong> 
+                        to "understand" the qualitative nature of a business through its business summary.
+                    </p>
+                    
+                    <h6 class="fw-bold mb-3">How to Use:</h6>
+                    <ol class="ps-3 mb-0">
+                        <li class="mb-3">
+                            <strong>Engine Setup:</strong> Open the "Engine Setup" accordion. Select the financial features you want the model to learn from and choose your target variable. 
+                            Click "Initialize & Train" to build a custom model optimized for your selection (This may take a while).
+                        </li>
+                        <li class="mb-3">
+                            <strong>Input Metrics:</strong> Once the engine is ready, the interface will generate fields for your selected features. 
+                            Fill in the financial data for the company you wish to value.
+                        </li>
+                        <li class="mb-3">
+                            <strong>Qualitative Context:</strong> Paste the company's business summary or a strategic overview into the text area. 
+                            The AI uses this to identify sectoral peers and qualitative similarities in its training set.
+                        </li>
+                        <li class="mb-0">
+                            <strong>Generate Report:</strong> Click "Generate Valuation Report" to receive a predicted valuation and a confidence range 
+                            derived from the model's historical performance (MDAPE).
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms of Service Modal -->
+    <div class="modal fade" id="termsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title serif fw-bold">Terms of Service</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-start p-4">
+                    <p class="fw-bold">1. Educational & Fun Use Only</p>
+                    <p>smartComps is an experimental, AI-powered tool created for personal entertainment and educational purposes. It is not intended for use in professional financial analysis, legal reporting, or investment decision-making.</p>
+                    
+                    <p class="fw-bold">2. No Liability</p>
+                    <p>The author and developers of this project are not responsible for any actions taken by users or for any consequences (financial, legal, or otherwise) resulting from the use of this tool. Predictions are based on historical data and machine learning algorithms which may be inaccurate or outdated.</p>
+                    
+                    <p class="fw-bold">3. "As-Is" Service</p>
+                    <p>This site is provided "as-is" without any warranties of any kind. We do not guarantee the uptime, accuracy, or reliability of the valuation engine or the data fetched from external sources.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div class="modal fade" id="privacyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title serif fw-bold">Privacy Policy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-start p-4">
+                    <p class="fw-bold">1. Data Storage</p>
+                    <p>We do not store, save, or persist the financial metrics or business summaries you input into this application in any database. All processing is done in-memory to generate the requested valuation and is cleared upon the end of your session.</p>
+                    
+                    <p class="fw-bold">2. User Responsibility</p>
+                    <p>You are solely responsible for the information you choose to input into the site. We strongly advise against inputting confidential, proprietary, or non-public information. By using this tool, you acknowledge that you do so at your own risk.</p>
+                    
+                    <p class="fw-bold">3. External Data</p>
+                    <p>This project may utilize third-party APIs (such as YFinance) to fetch market data. We are not responsible for the privacy practices of these external services.</p>
+                </div>
             </div>
         </div>
     </div>
