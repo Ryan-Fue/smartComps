@@ -58,13 +58,13 @@
 
         <!-- Model Performance Metrics (Shown after training) -->
         <div id="metrics-display" class="mb-5 d-none">
-            <div class="p-3 bg-light rounded-3 border-start border-4 border-primary">
-                <div class="valuator-label text-primary">Model Performance</div>
-                <div class="d-flex gap-4">
-                    <div id="mdape-score" class="h4 serif mb-0">MDAPE: --%</div>
-                    <div id="r2-score" class="h4 serif mb-0">R²: --</div>
+            <div class="p-4 bg-white rounded-3 border border-1 shadow-sm mx-auto" style="border-top: 4px solid var(--bfb-navy) !important; max-width: 600px;">
+                <div class="valuator-label text-center mb-2" style="color: var(--text-muted); cursor: help;" title="Performance metrics calculated on a held-out test set of companies.">Model Performance</div>
+                <div class="d-flex gap-5 justify-content-center align-items-center">
+                    <div id="mdape-score" class="h4 serif mb-0" style="cursor: help;" title="Median Absolute Percentage Error">MDAPE: --%</div>
+                    <div id="r2-score" class="h4 serif mb-0" style="cursor: help;" title="Coefficient of Determination (R-squared)">R²: --</div>
                 </div>
-                <div class="text-muted small">Based on unseen mid-market test data.</div>
+                <div class="text-muted small mt-2 text-center">Based on unseen mid-market test data.</div>
             </div>
         </div>
 
