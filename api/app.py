@@ -67,18 +67,18 @@ def train_model():
 
         X, y = engine.prepare_data(df, target_col=target)
 
-        # Split for accurate metrics
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        # Split for accurate metrics (fixed random_state for consistency)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Light tuning and evaluate for metrics
-        engine.tune_hyperparameters(X_train, y_train, n_trials=15)
+        # Tune on training set (find best params once)
+        engine.tune_hyperparameters(X_train, y_train, n_trials=25)
         metrics = engine.evaluate(X_test, y_test)
         
         # Persist metrics for range calculation
         engine.last_metrics = metrics
 
-        # Train final model on full data set
-        engine.tune_hyperparameters(X, y, n_trials=20)
+        # Retrain final model on full dataset using best params (very fast)
+        engine.train(X, y)
 
         return jsonify({
             "status": "success",
