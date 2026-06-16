@@ -23,7 +23,14 @@
         <div class="valuator-label">smartComps Valuator</div>
         
         <!-- Header Section -->
-        <h1 class="main-title serif">Valuation Interface <span style="font-size: 2rem; vertical-align: middle; color: #1e3a8a; cursor: help;">&#9432;</span></h1>
+        <h1 class="main-title serif">
+            Valuation Interface 
+            <span style="font-size: 2rem; vertical-align: middle; color: #1e3a8a; cursor: pointer;" 
+                  data-bs-toggle="modal" data-bs-target="#aboutModal" 
+                  title="Click to learn how to use this tool">
+                &#9432;
+            </span>
+        </h1>
 
         <!-- Step 1: Model Setup (Collapsible Configuration) -->
         <div class="accordion mb-5" id="setupAccordion">
@@ -129,6 +136,45 @@
                 </div>
                 <div class="mt-4 text-muted" style="font-size: 0.75rem;">
                     &copy; 2026 smartComps. Built for personal educational purposes.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div class="modal fade" id="aboutModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title serif fw-bold">About smartComps</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-start p-4">
+                    <p class="mb-4">
+                        <strong>smartComps</strong> is a valuation engine that uses Machine Learning to estimate company valuations. 
+                        It uniquely synthesizes hard financial multiples (Ex. Revenue, EBITDA) with high-dimensional <strong>NLP (Natural Language Processing)</strong> 
+                        to "understand" the qualitative nature of a business through its business summary.
+                    </p>
+                    
+                    <h6 class="fw-bold mb-3">How to Use:</h6>
+                    <ol class="ps-3 mb-0">
+                        <li class="mb-3">
+                            <strong>Engine Setup:</strong> Open the "Engine Setup" accordion. Select the financial features you want the model to learn from and choose your target variable. 
+                            Click "Initialize & Train" to build a custom model optimized for your selection (This may take a while).
+                        </li>
+                        <li class="mb-3">
+                            <strong>Input Metrics:</strong> Once the engine is ready, the interface will generate fields for your selected features. 
+                            Fill in the financial data for the company you wish to value.
+                        </li>
+                        <li class="mb-3">
+                            <strong>Qualitative Context:</strong> Paste the company's business summary or a strategic overview into the text area. 
+                            The AI uses this to identify sectoral peers and qualitative similarities in its training set.
+                        </li>
+                        <li class="mb-0">
+                            <strong>Generate Report:</strong> Click "Generate Valuation Report" to receive a predicted valuation and a confidence range 
+                            derived from the model's historical performance (MDAPE).
+                        </li>
+                    </ol>
                 </div>
             </div>
         </div>
