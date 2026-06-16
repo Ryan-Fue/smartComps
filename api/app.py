@@ -56,6 +56,9 @@ def train_model():
     
         df = pd.read_parquet('data/processed/UNIVERSAL_embedded.parquet')
 
+        # Filter for positive valuations to ensure log-transform stability
+        df = df[df[target] > 0]
+
         # Intialize engine with user selection
         global engine
         engine = ValuationEngine(

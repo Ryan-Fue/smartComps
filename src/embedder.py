@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 
 class FeatureProcessor:
     
-    def __init__(self, model_name: str = 'all-MiniLM-L6-v2'):
+    def __init__(self, model_name: str = 'all-mpnet-base-v2'):
         """
         Initializes the FeatureProcessor with a scaling strategy and a transformer model.
         """

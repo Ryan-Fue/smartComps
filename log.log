@@ -58,3 +58,59 @@
 2026-06-15 04:39:36,980 - INFO - Final Test Metrics: {'r2': 0.8033163310940346, 'mae': 4081639409.7070355, 'mape': 0.4952820198094909, 'mdape': np.float64(0.2831603950069812), 'accuracy_20': np.float64(0.3737024221453287), 'rmsle': 0.5991989542634196}
 2026-06-15 04:39:36,980 - INFO - Saving model to /Users/ryanfue/Projects/smartComps/smartComps/models/valuation_pipeline.joblib...
 2026-06-15 04:39:36,989 - INFO - Universal Valuation Model applied and saved successfully.
+2026-06-15 17:54:50,168 - INFO - No device provided, using mps
+2026-06-15 17:54:50,331 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:50,346 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/modules.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:50,440 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:50,440 - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-06-15 17:54:50,454 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:50,456 - INFO - Loading SentenceTransformer model from sentence-transformers/all-mpnet-base-v2.
+2026-06-15 17:54:50,545 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:50,559 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:50,646 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:50,661 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/README.md "HTTP/1.1 200 OK"
+2026-06-15 17:54:50,755 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:50,772 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/modules.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:50,860 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:50,876 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:50,964 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-06-15 17:54:51,056 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:51,073 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/config.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:51,263 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-06-15 17:54:51,360 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-06-15 17:54:51,458 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-06-15 17:54:51,549 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-06-15 17:54:51,639 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:51,653 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:51,746 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:51,761 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/config.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:51,853 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:51,868 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/config.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:52,023 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:52,036 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:52,129 - INFO - HTTP Request: GET https://huggingface.co/api/models/sentence-transformers/all-mpnet-base-v2/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-06-15 17:54:52,224 - INFO - HTTP Request: GET https://huggingface.co/api/models/sentence-transformers/all-mpnet-base-v2/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-06-15 17:54:52,352 - INFO - HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-06-15 17:54:52,365 - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-mpnet-base-v2/e8c3b32edf5434bc2275fc9bab85f82640a19130/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-06-15 17:54:52,466 - INFO - HTTP Request: GET https://huggingface.co/api/models/sentence-transformers/all-mpnet-base-v2 "HTTP/1.1 200 OK"
+2026-06-15 17:54:53,199 - INFO - Loading data from /Users/ryanfue/Projects/smartComps/smartComps/data/processed/UNIVERSAL_training.parquet...
+2026-06-15 17:54:53,232 - INFO - Generating embeddings for column: business_summary...
+2026-06-15 17:56:24,738 - INFO - Generated columns for: business_summary...
+2026-06-15 17:56:24,765 - INFO - Successfully appended embeddings.
+2026-06-15 17:56:24,774 - INFO - Successfully dropped 3 columns.
+2026-06-15 17:56:24,774 - INFO - Saving processed data to /Users/ryanfue/Projects/smartComps/smartComps/data/processed/UNIVERSAL_embedded.parquet...
+2026-06-15 17:56:24,945 - INFO - Universal pipeline complete -> /Users/ryanfue/Projects/smartComps/smartComps/data/processed/UNIVERSAL_embedded.parquet
+2026-06-15 18:00:31,022 - INFO - Loading embedded data from /Users/ryanfue/Projects/smartComps/smartComps/data/processed/UNIVERSAL_embedded.parquet...
+2026-06-15 18:00:31,121 - INFO - Preparing data for modeling...
+2026-06-15 18:00:31,123 - INFO - Schema change detected. Rebuilding pipeline...
+2026-06-15 18:00:31,191 - INFO - Starting hyperparameter tuning (30 trials)...
+2026-06-15 18:00:31,191 - INFO - Starting Optuna optimization (n_trials=30)...
+2026-06-15 18:01:54,046 - INFO - Optimization complete. Best score: -0.6670437057813009
+2026-06-15 18:01:54,048 - INFO - Retraining model with best hyperparameters...
+2026-06-15 18:01:54,048 - INFO - Training model on 3466 samples with 776 features...
+2026-06-15 18:01:55,046 - INFO - Pipeline updated and fully trained with best parameters.
+2026-06-15 18:01:55,046 - INFO - Evaluating optimized model...
+2026-06-15 18:01:55,079 - INFO - Evaluation Metrics: {'r2': 0.7980412250835942, 'mae': 4179260080.5905423, 'mape': 0.4803803435874455, 'mdape': np.float64(0.29395072659544824), 'accuracy_20': np.float64(0.3621683967704729), 'rmsle': 0.5829420638208087}
+2026-06-15 18:01:55,079 - INFO - Final Test Metrics: {'r2': 0.7980412250835942, 'mae': 4179260080.5905423, 'mape': 0.4803803435874455, 'mdape': np.float64(0.29395072659544824), 'accuracy_20': np.float64(0.3621683967704729), 'rmsle': 0.5829420638208087}
+2026-06-15 18:01:55,079 - INFO - Saving model to /Users/ryanfue/Projects/smartComps/smartComps/models/valuation_pipeline.joblib...
+2026-06-15 18:01:55,086 - INFO - Universal Valuation Model applied and saved successfully.

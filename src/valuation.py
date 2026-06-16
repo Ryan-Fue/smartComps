@@ -40,7 +40,7 @@ class ValuationEngine:
     )
     DEFAULT_CAT_COLS = ("sector",)
     DEFAULT_TARGET_COLS = ("enterprise_value",)
-    DEFAULT_NLP_COLS = tuple(f"nlp_{i}" for i in range(384))
+    DEFAULT_NLP_COLS = tuple(f"nlp_{i}" for i in range(768))
 
     VALID_SECTORS = (
         "Basic Materials",
