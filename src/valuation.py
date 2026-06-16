@@ -142,6 +142,17 @@ class ValuationEngine:
             if "ebitda_margin" not in self.base_fin_cols:
                 self.base_fin_cols.append("ebitda_margin")
 
+            # Create Sector-Margin Interactions (Contextual accuracy)
+            if "sector" in df.columns:
+                # Use a stable set of sectors to ensure consistent columns across train/predict
+                for sec in self.VALID_SECTORS:
+                    clean_sec = str(sec).replace(" ", "_").replace("-", "").replace("&", "and")
+                    col_name = f"margin_{clean_sec}"
+                    # Multiply margin by boolean sector mask (1 or 0)
+                    df[col_name] = (df["sector"] == sec).astype(float) * df["ebitda_margin"]
+                    if col_name not in self.base_fin_cols:
+                        self.base_fin_cols.append(col_name)
+
         if "total_debt" in self.base_fin_cols and "estimated_revenue" in self.base_fin_cols:
             df["debt_to_revenue"] = df["total_debt"] / (df["estimated_revenue"] + 1)
             if "debt_to_revenue" not in self.base_fin_cols:
