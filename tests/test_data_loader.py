@@ -89,7 +89,7 @@ def test_build_universal_training_table(data_loader, tmp_path):
         "ticker": ["KEEP1", "MISSING_EV", "MISSING_EBITDA", "MISSING_REV", "SHORT_SUMMARY", "KEEP2"],
         "enterprise_value": [500_000_000, None, 500_000_000, 500_000_000, 500_000_000, 1_000_000_000],
         "ebitda": [50_000_000, 50_000_000, None, 50_000_000, 50_000_000, 100_000_000],
-        "estimated_revenue": [100_000_000, 100_000_000, 100_000_000, None, 100_000_000, 200_000_000],
+        "estimated_revenue": [100_000_000, 100_000_000, 1_000_000, None, 100_000_000, 200_000_000],
         "total_debt": [5, 5, 5, 5, 5, 10],
         "total_cash": [2, 2, 2, 2, 2, 4],
         "forwardPE": [15, 15, 15, 15, 15, 30],

@@ -8,7 +8,7 @@ from src.valuation import ValuationEngine
 def mock_ml_data():
     """Generates a mock dataset resembling the Gold layer with flattened embeddings and categorical data."""
     np.random.seed(42)
-    n_samples = 30
+    n_samples = 100
     
     # Financial data
     data = {
@@ -24,8 +24,8 @@ def mock_ml_data():
         "sector": np.random.choice(["Tech", "Finance", "Healthcare"], n_samples)
     }
     
-    # NLP flattened embeddings (384 dims)
-    for i in range(384):
+    # NLP flattened embeddings (768 dims)
+    for i in range(768):
         data[f"nlp_{i}"] = np.random.rand(n_samples)
         
     return pd.DataFrame(data)
@@ -34,7 +34,7 @@ def test_valuation_engine_dynamic_init():
     """Verifies that the engine initializes with all base columns by default."""
     engine = ValuationEngine()
     assert len(engine.base_fin_cols) == 8
-    assert len(engine.base_nlp_cols) == 384
+    assert len(engine.base_nlp_cols) == 768
     assert engine.base_cat_cols == ["sector"]
 
 def test_schema_adaptation(mock_ml_data):
@@ -43,15 +43,15 @@ def test_schema_adaptation(mock_ml_data):
     
     # Test 1: Full data
     X, y = engine.prepare_data(mock_ml_data)
-    # 7 fin + 1 cat + 384 nlp = 392 features
-    assert X.shape[1] == 392
+    # 7 fin + 1 cat + 768 nlp + 14 derived = 790 features
+    assert X.shape[1] == 790
     assert "sector" in engine.cat_cols
     
     # Test 2: Missing financial columns
     df_slim = mock_ml_data.drop(columns=["forwardPE", "total_cash"])
     X_slim, y_slim = engine.prepare_data(df_slim)
-    # 5 fin + 1 cat + 384 nlp = 390 features
-    assert X_slim.shape[1] == 390
+    # 5 fin + 1 cat + 768 nlp + 14 derived = 788 features
+    assert X_slim.shape[1] == 788
     assert "forwardPE" not in engine.fin_cols
 
 def test_train_predict_cycle(mock_ml_data):
@@ -62,7 +62,7 @@ def test_train_predict_cycle(mock_ml_data):
     engine.train(X, y)
     predictions = engine.predict(X)
     
-    assert predictions.shape == (30, 1)
+    assert predictions.shape == (100, 1)
     metrics = engine.evaluate(X, y)
     assert "r2" in metrics
     assert metrics["mae"] >= 0
@@ -109,7 +109,7 @@ def test_optuna_tuning(mock_ml_data):
     
     # Verify tuning didn't break prediction
     preds = engine.predict(X)
-    assert preds.shape == (30, 1)
+    assert preds.shape == (100, 1)
 
 def test_infinite_value_handling(mock_ml_data):
     """Verifies that infinite values in the input data are handled correctly."""
@@ -130,4 +130,4 @@ def test_infinite_value_handling(mock_ml_data):
     
     # Training should still work due to KNNImputer
     engine.train(X, y)
-    assert engine.predict(X).shape == (30, 1)
+    assert engine.predict(X).shape == (100, 1)

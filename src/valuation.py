@@ -206,8 +206,18 @@ class ValuationEngine:
         return X, y
 
     def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame) -> None:
-        """Trains the valuation model."""
+        """Trains the valuation model with dynamic PCA adjustment for sample size."""
         self.logger.info(f"Training model on {len(X_train)} samples with {X_train.shape[1]} features...")
+        
+        # Ensure PCA components don't exceed sample size
+        if self.nlp_cols:
+            preprocess = self.pipeline.named_steps['preprocess']
+            for name, trans, _ in preprocess.transformers:
+                if name == 'nlp_prep':
+                    pca = trans.named_steps['pca']
+                    pca.n_components = min(50, X_train.shape[0], len(self.nlp_cols))
+                    break
+        
         self.pipeline.fit(X_train, y_train)
 
     def tune_hyperparameters(self, 
@@ -217,6 +227,16 @@ class ValuationEngine:
                              timeout: int = 600) -> dict:
         """Uses Optuna to find the best hyperparameters and automatically updates the pipeline."""
         self.logger.info(f"Starting Optuna optimization (n_trials={n_trials})...")
+        
+        # Pre-adjust PCA for cross-validation stability
+        if self.nlp_cols:
+            preprocess = self.pipeline.named_steps['preprocess']
+            for name, trans, _ in preprocess.transformers:
+                if name == 'nlp_prep':
+                    pca = trans.named_steps['pca']
+                    # Use a slightly more conservative sample count for CV folds (3 splits -> 2/3 samples per fit)
+                    pca.n_components = min(50, int(X_train.shape[0] * 0.6), len(self.nlp_cols))
+                    break
 
         def objective(trial):
             # Define hyperparameter search space
