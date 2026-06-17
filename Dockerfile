@@ -6,7 +6,7 @@
 
 # Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
 
-ARG PYTHON_VERSION=3.13.1
+ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim as base
 
 # Prevents Python from writing pyc files.
@@ -30,22 +30,20 @@ RUN adduser \
     --uid "${UID}" \
     appuser
 
-# Download dependencies as a separate step to take advantage of Docker's caching.
-# Leverage a cache mount to /root/.cache/pip to speed up subsequent builds.
-# Leverage a bind mount to requirements.txt to avoid having to copy them into
-# into this layer.
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=bind,source=requirements.txt,target=requirements.txt \
-    python -m pip install -r requirements.txt
+# Copy only the dependency list first
+COPY pyproject.toml .
+
+RUN pip install --no-cache-dir .
 
 # Switch to the non-privileged user to run the application.
 USER appuser
 
 # Copy the source code into the container.
-COPY . .
+COPY api/ api/
+COPY src/ src/
 
 # Expose the port that the application listens on.
-EXPOSE 8000
+EXPOSE 5001
 
 # Run the application.
-CMD gunicorn 'api.app:app' --bind=0.0.0.0:8000
+CMD gunicorn 'api.app:app' --bind=0.0.0.0:5001
