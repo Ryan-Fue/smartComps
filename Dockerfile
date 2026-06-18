@@ -24,23 +24,27 @@ ARG UID=10001
 RUN adduser \
     --disabled-password \
     --gecos "" \
-    --home "/nonexistent" \
+    --home "/home/appuser" \
     --shell "/sbin/nologin" \
-    --no-create-home \
     --uid "${UID}" \
     appuser
 
 # Copy only the dependency list first
-COPY pyproject.toml .
+COPY pyproject.toml poetry.lock* ./
 
-RUN pip install --no-cache-dir .
-
-# Switch to the non-privileged user to run the application.
-USER appuser
+# Install poetry and project dependencies
+RUN pip install --no-cache-dir poetry && \
+    poetry config virtualenvs.create false && \
+    export POETRY_HTTP_TIMEOUT=300 && \
+    poetry install --no-interaction --no-ansi --no-root --only main
 
 # Copy the source code into the container.
 COPY api/ api/
 COPY src/ src/
+
+# Switch to the non-privileged user to run the application.
+USER appuser
+
 
 # Expose the port that the application listens on.
 EXPOSE 5001

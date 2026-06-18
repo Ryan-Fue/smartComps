@@ -14,7 +14,7 @@ services:
       - 5001:5001
     volumes:
       - ./data:/app/data
-      - /models:/app/models
+      - ./models:/app/models
     env_file: 
       - .env
 
