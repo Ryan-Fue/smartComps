@@ -2,6 +2,8 @@
 
 `smartComps` is an automated, high-performance quantitative pipeline designed to ingest, sanitize, and enrich massive datasets of public company financials and SEC filings. The system synthesizes hard financial multiples with high-dimensional NLP embeddings to predict company valuations with institutional-grade precision.
 
+Full Website Implementation on [BFB Website](https://github.com/Nathangong-coder/BFB-Website-Re-Design)
+
 <img width="445" height="593" alt="image" src="https://github.com/user-attachments/assets/43e070db-ecc8-4828-a625-2002ceaa044e" />
 <img width="520" height="340" alt="image" src="https://github.com/user-attachments/assets/d0143bda-272e-40b0-8fbd-1587d62cf78f" />
 
